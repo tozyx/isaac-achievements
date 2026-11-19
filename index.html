@@ -6,6 +6,15 @@
 <meta name="description" content="以撒的结合 通关解锁全角色成就完成清单，支持进度追踪、优先级标记、存档导入">
 <meta name="theme-color" content="#0c1018">
 <script id="theme-bootstrap">
+const LANGUAGE_KEY = 'isaac_achieve_language';
+const browserLanguages = navigator.languages?.length ? navigator.languages : [navigator.language || ''];
+const preferredLanguage = browserLanguages.find(tag => /^(zh|en)(?:-|$)/i.test(tag));
+let language = /^zh(?:-|$)/i.test(preferredLanguage || '') ? 'zh-CN' : 'en';
+try {
+  const savedLanguage = localStorage.getItem(LANGUAGE_KEY);
+  if (savedLanguage === 'zh-CN' || savedLanguage === 'en') language = savedLanguage;
+} catch { /* Storage may be unavailable. */ }
+document.documentElement.lang = language;
 const THEME_KEY = 'isaac_achieve_theme';
 let themeMode = 'auto';
 try {
@@ -132,6 +141,8 @@ body {
 .brand h1 { font-size: 20px; font-weight: 700; letter-spacing: .5px; white-space: nowrap; }
 .brand .subtitle { font-size: 12px; color: var(--text-2); margin-top: 1px; }
 
+.brand-actions { display: flex; align-items: center; gap: 6px; }
+[lang="en"] .brand h1 { white-space: normal; }
 .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tool-btn {
   appearance: none; cursor: pointer;
@@ -143,6 +154,7 @@ body {
   display: inline-flex; align-items: center; gap: 6px;
   transition: all .18s ease;
 }
+.feedback-btn { text-decoration: none; }
 .tool-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 .tool-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 .tool-btn.danger:hover { color: #ef4444; border-color: #ef4444; background: var(--pri-soft); }
@@ -590,6 +602,10 @@ main { max-width: 1480px; margin: 0 auto; padding: 22px 20px 80px; }
 .save-dropzone .dz-hint { font-size: 11px; color: var(--text-3); line-height: 1.4; }
 
 /* 导入状态 */
+.save-location > summary { width: fit-content; }
+.save-location .steam-input { box-sizing: border-box; width: 100%; }
+.save-location-panel { display: grid; gap: 6px; margin-top: 8px; }
+.save-location-panel .tool-btn { justify-self: start; }
 .steam-status { font-size: 12px; color: var(--text-2); min-height: 16px; line-height: 1.5; }
 .steam-status.err { color: #ef4444; }
 .steam-status.ok { color: #22c55e; }
@@ -838,6 +854,7 @@ main { max-width: 1480px; margin: 0 auto; padding: 22px 20px 80px; }
           </div>
         </div>
         <div class="brand-actions">
+          <button class="tool-btn" id="languageBtn" type="button" lang="en">English</button>
           <button class="tool-btn collapse-btn" id="collapseBtn" title="设置（主题 / 导入 / 重置）"><span class="t-icon">⚙️</span></button>
         </div>
       </div>
@@ -846,6 +863,9 @@ main { max-width: 1480px; margin: 0 auto; padding: 22px 20px 80px; }
         <button class="tool-btn" id="importAchBtn" title="从存档导入已完成成就"><span class="t-icon">🎮</span><span class="tb-text">导入成就</span></button>
         <button class="tool-btn" id="priPresetBtn" title="优先级预设：导出 / 导入"><span class="t-icon">🏷</span><span class="tb-text">优先级预设</span></button>
         <button class="tool-btn danger" id="resetBtn" title="重置所有完成进度"><span class="t-icon">🗑</span><span class="tb-text">重置</span></button>
+        <a class="tool-btn feedback-btn" href="https://github.com/tozyx/isaac-achievements/issues" target="_blank" rel="noopener noreferrer">
+          <span class="t-icon" aria-hidden="true">💬</span><span class="tb-text">问题反馈</span>
+        </a>
         <button class="tool-btn" id="backToViewBtn" title="回到上次浏览位置" style="display:none"><span class="t-icon">↩</span><span class="tb-text">回到上次位置</span></button>
         <input type="file" id="saveImportFile" accept=".dat,.sav,application/octet-stream" hidden>
         <input type="file" id="priPresetFile" accept="application/json,.json" hidden>
@@ -889,14 +909,14 @@ main { max-width: 1480px; margin: 0 auto; padding: 22px 20px 80px; }
   <div class="preset-body">
     <p class="preset-desc">优先级是一串代码，每个人设置不同代码就不同。复制代码分享给社区，或粘贴别人的代码一键套用。</p>
 
-    <button class="tool-btn preset-btn" id="presetExportBtn"><span class="t-icon">📤</span>生成我的优先级代码</button>
+    <button class="tool-btn preset-btn" id="presetExportBtn"><span class="t-icon">📤</span><span class="button-label">生成我的优先级代码</span></button>
 
     <div class="preset-code-wrap">
       <textarea id="presetCode" rows="3" placeholder="粘贴优先级代码（ISAACPRI1-...）"></textarea>
-      <button class="tool-btn preset-btn" id="presetImportCodeBtn"><span class="t-icon">📥</span>导入此代码</button>
+      <button class="tool-btn preset-btn" id="presetImportCodeBtn"><span class="t-icon">📥</span><span class="button-label">导入此代码</span></button>
     </div>
 
-    <button class="tool-btn preset-btn danger" id="presetClearBtn"><span class="t-icon">🗑</span>清空我的优先级</button>
+    <button class="tool-btn preset-btn danger" id="presetClearBtn"><span class="t-icon">🗑</span><span class="button-label">清空我的优先级</span></button>
   </div>
 </div>
 
@@ -912,23 +932,34 @@ main { max-width: 1480px; margin: 0 auto; padding: 22px 20px 80px; }
       <span class="dz-icon">📁</span>
       <span class="dz-text">点击选择存档文件，或将文件拖到这里</span>
       <span class="dz-hint">支持 rep_persistentgamedata1.dat 等 .dat 存档</span>
-      <button class="tool-btn preset-btn" id="saveImportBtn" type="button"><span class="t-icon">📂</span>选择文件…</button>
+      <button class="tool-btn preset-btn" id="saveImportBtn" type="button"><span class="t-icon">📂</span><span class="button-label">选择文件…</span></button>
     </div>
-    <div class="steam-status" id="steamStatus"></div>
+    <details class="save-location" id="saveLocation">
+      <summary class="tool-btn">查找 Windows 存档</summary>
+      <div class="save-location-panel">
+        <label id="saveAccountLabel" for="saveAccount">SteamID64、数字资料链接或 userdata 文件夹编号（可选）</label>
+        <input class="steam-input" id="saveAccount" type="text" autocomplete="off" spellcheck="false" placeholder="例如 76561198015863878">
+        <input class="steam-input" id="savePath" type="text" readonly aria-label="Windows 存档目录">
+        <button class="tool-btn" id="copySavePath" type="button">复制目录路径</button>
+        <p class="steam-hint" id="savePathHelp">复制路径后，粘贴到资源管理器或「选择文件」窗口的地址栏。Steam 安装在其他位置时，从实际安装目录进入 userdata。</p>
+        <p class="steam-status" id="savePathStatus" role="status"></p>
+      </div>
+    </details>
+    <div class="steam-status" id="steamStatus" role="status"></div>
 
     <div class="steam-sep">或</div>
 
     <p class="preset-desc">从 Steam 拉取你的成就进度（需要 Steam 个人资料的“游戏详情”公开）。</p>
     <input class="steam-input" id="steamInput" type="text" placeholder="粘贴 Steam 资料链接或 17 位数字 ID，如 https://steamcommunity.com/profiles/76561198000000000">
     <div class="steam-options">
-      <label><input type="checkbox" id="steamMerge" checked> 保留当前已勾选的成就（合并导入）</label>
+      <label><input type="checkbox" id="steamMerge" checked> <span class="button-label">保留当前已勾选的成就（合并导入）</span></label>
     </div>
     <div class="steam-remember">
-      <label><input type="checkbox" id="steamRemember"> 记住我的 Steam 账号</label>
+      <label><input type="checkbox" id="steamRemember"> <span class="button-label">记住我的 Steam 账号</span></label>
       <button type="button" class="steam-remember-clear" id="steamRememberClear">清除记忆</button>
     </div>
     <p class="steam-hint">勾选「记住」后，下次打开面板会自动填入，无需重复输入。</p>
-    <button class="tool-btn preset-btn" id="steamImportBtn"><span class="t-icon">☁</span>从 Steam 导入</button>
+    <button class="tool-btn preset-btn" id="steamImportBtn"><span class="t-icon">☁</span><span class="button-label">从 Steam 导入</span></button>
   </div>
 </div>
 
@@ -1179,6 +1210,786 @@ const TAB_DEFS = [
 const NORMAL_ORDER = ['以撒','抹大拉','该隐','犹大','???','夏娃','参孙','阿撒泻勒','拉撒路','伊甸','游魂','莉莉丝','店主','亚玻伦','遗骸','伯大尼','雅各和以扫','全角色'];
 const TAINTED_ORDER = NORMAL_ORDER.filter(c => c !== '雅各和以扫' && c !== '全角色').map(c => '堕化' + c).concat(['堕化雅各', '全角色']);
 
+/* ---------- Checklist language ---------- */
+const tabEnglish = {
+  normal: ['Characters', 'Completion marks and their unlocks, grouped by character.'],
+  tainted: ['Tainted characters', 'Completion marks and their unlocks, grouped by tainted character.'],
+  challenge: ['Challenges', 'Achievements for unlocking and completing challenges.'],
+  level: ['Stages', 'Achievements for unlocking and clearing stages.'],
+  charunlock: ['Character unlocks', 'Achievements for unlocking new characters.'],
+  boss: ['Bosses', 'Achievements for defeating bosses.'],
+  other: ['Other', 'Collection, interaction, and other achievements.'],
+};
+const characterEnglish = ['Isaac', 'Magdalene', 'Cain', 'Judas', '???', 'Eve', 'Samson', 'Azazel',
+  'Lazarus', 'Eden', 'The Lost', 'Lilith', 'Keeper', 'Apollyon', 'The Forgotten',
+  'Bethany', 'Jacob & Esau', 'All characters'];
+const groupEnglish = Object.fromEntries(NORMAL_ORDER.map((name, i) => [name, characterEnglish[i]]));
+Object.assign(groupEnglish, {
+  堕化雅各: 'Tainted Jacob', 未分组: 'Ungrouped', 解锁挑战: 'Challenge unlocks',
+  完成挑战: 'Challenge completions', 解锁关卡: 'Stage unlocks', 通过关卡: 'Stage completions',
+});
+
+// English descriptions and rewards are added by achievement ID, independent of display order.
+const achievementEnglish = {
+  1: ["Have seven heart containers at the same time in a single run.", "Magdalene"],
+  2: ["Hold 55 coins at the same time in a single run.", "Cain"],
+  3: ["Defeat Satan once.", "Judas"],
+  4: ["Defeat Mom once.", "Chapter 4"],
+  5: ["Defeat Mom once.", "Famine, Pestilence, War, and Death"],
+  6: ["Defeat Mom once.", "Cube of Meat and Ball of Bandages"],
+  7: ["Defeat Famine, Pestilence, War, or Death once.", "The Book of Revelations"],
+  8: ["Defeat Mom's Heart three times.", "Transcendence"],
+  9: ["Earn the Boss Rush completion mark as Azazel.", "The Nail"],
+  10: ["Defeat Mom's Heart eight times.", "A Quarter"],
+  11: ["Defeat Mom's Heart nine times.", "Dr. Fetus"],
+  12: ["Destroy 100 tinted rocks.", "Small Rock"],
+  13: ["Clear Chapter 1 once.", "Monstro's Tooth"],
+  14: ["Clear Chapter 2 once.", "Little Chubby"],
+  15: ["Defeat Lokii once.", "Loki's Horns"],
+  16: ["Clear the Basement 40 times.", "Steven"],
+  17: ["Clear Chapter 2 30 times.", "C.H.A.D."],
+  18: ["Clear the Depths 20 times.", "Gish"],
+  19: ["Create a Level 4 Bandage Girl.", "Super Bandage"],
+  20: ["Defeat Isaac as Magdalene.", "The Relic"],
+  21: ["Defeat Isaac as Cain.", "Sack of Pennies"],
+  22: ["Defeat each of the Seven Deadly Sins at least once.", "The Book of Sin"],
+  23: ["Defeat Gish once.", "Little Gish"],
+  24: ["Defeat Steven once.", "Little Steven"],
+  25: ["Defeat C.H.A.D. once.", "Little C.H.A.D."],
+  26: ["Enter 10 Arcades.", "The Gamekid"],
+  27: ["Use the Bible to defeat Mom, Mom's Heart, or It Lives!", "The Halo"],
+  28: ["Destroy 10 tinted rocks.", "Mr. Mega"],
+  29: ["Defeat Isaac as ???.", "The D6, and Isaac starts with it"],
+  30: ["Reach 100 deaths in the game statistics.", "Scissors"],
+  31: ["Pick up two items with the Dead tag in one run.", "The Parasite"],
+  32: ["Defeat Mom's Heart 10 times.", "???"],
+  33: ["Defeat Mom's Heart 5 times.", "Higher difficulty in Normal and Hard mode, plus half Soul Hearts"],
+  34: ["Defeat Mom's Heart 11 times.", "It Lives!"],
+  35: ["Pick up three Mom items in one run.", "Mom's Contacts"],
+  36: ["Use the Death tarot card four times.", "The Necronomicon"],
+  37: ["Clear Chapter 1 without taking damage.", "No reward"],
+  38: ["Clear Chapter 2 without taking damage.", "No reward"],
+  39: ["Clear Chapter 3 without taking damage.", "No reward"],
+  40: ["Clear Chapter 4 without taking damage.", "No reward"],
+  41: ["Defeat both ??? and The Lamb at least once.", "No reward"],
+  42: ["Clear two floors in a row without picking up any hearts.", "Eve"],
+  43: ["Defeat Satan as Isaac.", "Mom's Knife"],
+  44: ["Defeat Satan as Eve.", "Razor Blade"],
+  45: ["Defeat Satan as Magdalene.", "Guardian Angel"],
+  46: ["Defeat Satan as Cain.", "Bomb Bag"],
+  47: ["Defeat The Lamb as Azazel.", "Demon Baby"],
+  48: ["Defeat Satan as ???.", "Forget Me Now"],
+  49: ["Defeat ??? as Isaac.", "D20"],
+  50: ["Defeat ??? as Magdalene.", "Celtic Cross"],
+  51: ["Defeat The Lamb as Cain.", "Abel"],
+  52: ["Defeat The Lamb as Judas.", "Curved Horn"],
+  53: ["Defeat ??? as Eve.", "Sacrificial Dagger"],
+  54: ["Defeat Isaac as Samson.", "Bloody Lust"],
+  55: ["Defeat ??? as Samson.", "Bloody Penny"],
+  56: ["Defeat Satan as Samson.", "Blood Rights"],
+  57: ["Defeat Isaac 5 times.", "The Polaroid"],
+  58: ["Hold both Key Pieces in the same run.", "Dad's Key"],
+  59: ["Donate 900 coins to the Donation Machine.", "The Candle"],
+  60: ["Complete Challenge #13.", "Burnt Penny"],
+  61: ["Kill 20 shopkeepers.", "Lucky Toe"],
+  62: ["Complete Challenge #19.", "Epic Fetus"],
+  63: ["Complete Challenge #14.", "SMB Super Fan"],
+  64: ["Play a Shell Game 100 times.", "Counterfeit Penny"],
+  65: ["Pick up three Guppy items in a single run.", "Guppy's Hairball"],
+  66: ["Pick up ten items from Angel Rooms.", "Conquest"],
+  67: ["Clear two floors in a row without taking damage.", "Samson"],
+  68: ["Defeat Isaac 10 times.", "Triachnid"],
+  69: ["Collect the items and unlock the endings and achievements in Rebirth, excluding The Lost and its unlocks.", "No reward"],
+  70: ["Clear Boss Rush as Isaac.", "Isaac's Head"],
+  71: ["Defeat The Lamb as Magdalene.", "Maggy's Faith"],
+  72: ["Defeat Satan as Judas.", "Judas' Tongue"],
+  73: ["Defeat The Lamb as ???.", "???'s Soul"],
+  74: ["Defeat The Lamb as Samson.", "Samson's Lock"],
+  75: ["Defeat ??? as Cain.", "Cain's Eye"],
+  76: ["Defeat Isaac as Eve.", "Eve's Bird Foot"],
+  77: ["Defeat ??? as Judas, or defeat Super Pride once.", "The Left Hand"],
+  78: ["Defeat Satan 5 times.", "The Negative"],
+  79: ["Take three Devil Deals in one run.", "Azazel"],
+  80: ["Have four Soul Hearts in one run.", "Lazarus"],
+  81: ["Defeat Mom's Heart once.", "Eden"],
+  82: ["Die in a Sacrifice Room while holding Missing Poster.", "The Lost"],
+  83: ["Clear Chapter 6 without taking damage.", "No reward"],
+  84: ["Collect every item and unlock every ending.", "No reward"],
+  85: ["Destroy 100 rocks.", "Lucky Rock"],
+  86: ["Defeat every boss in the Basement at least once.", "The Cellar"],
+  87: ["Defeat every boss in the Caves at least once.", "The Catacombs"],
+  88: ["Defeat every boss in the Depths at least once.", "The Necropolis"],
+  89: ["Complete Challenge #1.", "Rune of Hagalaz"],
+  90: ["Complete Challenge #2.", "Rune of Jera"],
+  91: ["Complete Challenge #3.", "Rune of Ehwaz"],
+  92: ["Complete Challenge #4.", "Rune of Dagaz"],
+  93: ["Complete Challenge #5.", "Rune of Ansuz"],
+  94: ["Complete Challenge #6.", "Rune of Perthro"],
+  95: ["Complete Challenge #20.", "Rune of Berkano"],
+  96: ["Complete Challenge #8.", "Rune of Algiz"],
+  97: ["Complete Challenge #9.", "Chaos Card"],
+  98: ["Complete Challenge #10.", "Credit Card"],
+  99: ["Complete Challenge #11.", "Rules Card"],
+  100: ["Complete Challenge #12.", "Card Against Humanity"],
+  101: ["Complete Challenge #15.", "Swallowed Penny"],
+  102: ["Complete Challenge #16.", "Robo-Baby 2.0"],
+  103: ["Complete Challenge #17.", "Death's Touch"],
+  104: ["Complete Challenge #18.", "Tech.5"],
+  105: ["Clear Boss Rush as Lazarus.", "Missing No."],
+  106: ["Defeat Isaac as Isaac.", "Isaac's Tears"],
+  107: ["Defeat Isaac as Judas.", "Guillotine"],
+  108: ["Clear Boss Rush as Judas.", "Judas' Shadow"],
+  109: ["Clear Boss Rush as Magdalene.", "Maggy's Bow"],
+  110: ["Clear Boss Rush as Cain.", "Cain's Other Eye"],
+  111: ["Defeat The Lamb as Eve.", "Black Lipstick"],
+  112: ["Clear Boss Rush as Eve.", "Eve's Mascara"],
+  113: ["Defeat ??? as ???.", "Fate"],
+  114: ["Clear Boss Rush as ???.", "???'s Only Friend"],
+  115: ["Clear Boss Rush as Samson.", "Samson's Chains"],
+  116: ["Defeat Isaac as Lazarus.", "Lazarus' Rags"],
+  117: ["Defeat Satan as Lazarus.", "Broken Ankh"],
+  118: ["Defeat ??? as Lazarus.", "Store Credit"],
+  119: ["Defeat The Lamb as Lazarus.", "Pandora's Box"],
+  120: ["Complete Challenge #7.", "Suicide King"],
+  121: ["Defeat Isaac as Eden.", "Blank Card"],
+  122: ["Defeat Satan as Eden.", "Book of Secrets"],
+  123: ["Defeat ??? as Eden.", "Mysterious Paper"],
+  124: ["Defeat The Lamb as Eden.", "Mystery Sack"],
+  125: ["Clear Boss Rush as Eden.", "Undefined"],
+  126: ["Defeat Isaac as Azazel.", "Satanic Bible"],
+  127: ["Defeat Satan as Azazel.", "Daemon's Tail"],
+  128: ["Defeat ??? as Azazel.", "Abaddon"],
+  129: ["Defeat Isaac as The Lost.", "Isaac's Heart"],
+  130: ["Defeat Satan as The Lost.", "The Mind"],
+  131: ["Defeat ??? as The Lost.", "The Body"],
+  132: ["Defeat The Lamb as The Lost.", "The Soul"],
+  133: ["Clear Boss Rush as The Lost.", "D100"],
+  134: ["Donate 10 coins to the Donation Machine.", "Blue Map"],
+  135: ["Donate 50 coins to the Donation Machine.", "There's Options and More Options"],
+  136: ["Donate 150 coins to the Donation Machine.", "Black Candle"],
+  137: ["Donate 400 coins to the Donation Machine.", "Red Candle"],
+  138: ["Donate 999 coins to the Donation Machine.", "Stop Watch"],
+  139: ["Defeat Mom's Heart 4 times.", "Wire Coat Hanger"],
+  140: ["Defeat Mom's Heart 6 times.", "Ipecac"],
+  141: ["Defeat Mom's Heart 7 times.", "Experimental Treatment"],
+  142: ["Pick up 20 items from Devil Rooms.", "Krampus"],
+  143: ["Defeat Krampus once.", "Head of Krampus"],
+  144: ["Build a Level 4 Meat Boy.", "No reward"],
+  145: ["Destroy 100 poop obstacles.", "Butter Bean"],
+  146: ["Pick up two syringe items in one run.", "Little Baggy"],
+  147: ["Use a Blood Donation Machine 30 times.", "Blood Bag"],
+  148: ["Destroy 30 Slot Machines.", "D4"],
+  149: ["Defeat The Lamb as Isaac.", "Missing Poster"],
+  150: ["Defeat Mom's Heart 2 times.", "Rubber Cement"],
+  151: ["Donate 20 coins to the Donation Machine.", "Shops stock three items"],
+  152: ["Donate 100 coins to the Donation Machine.", "Shops stock four items"],
+  153: ["Donate 200 coins to the Donation Machine.", "Shops stock five items"],
+  154: ["Donate 600 coins to the Donation Machine.", "Shops stock six items"],
+  155: ["Defeat either ??? or The Lamb.", "Uriel and Gabriel"],
+  156: ["Earn every Hard mode completion mark as The Lost.", "Godhead"],
+  157: ["Unlock Sacrificial Dagger and It Lives!.", "Challenge #4: Darkness Falls"],
+  158: ["Unlock Magdalene.", "Challenge #5: The Tank"],
+  159: ["Unlock Transcendence.", "Challenge #6: Solar System"],
+  160: ["Unlock It Lives!.", "Challenge #7: Suicide King"],
+  161: ["Unlock Guppy's Hairball.", "Challenge #8: Cat Got Your Tongue"],
+  162: ["Unlock Dr. Fetus.", "Challenge #9: Demo Man"],
+  163: ["Unlock Magdalene.", "Challenge #10: Cursed!"],
+  164: ["Unlock Epic Fetus and Loki's Horns.", "Challenge #11: Glass Cannon"],
+  165: ["Unlock Dad's Key and It Lives!.", "Challenge #19: The Family Man"],
+  166: ["Unlock Chapter 4.", "Challenge #20: Purist"],
+  167: ["Defeat Mom's Heart or It Lives! on Hard mode as Isaac.", "Lost Baby"],
+  168: ["Defeat Mom's Heart or It Lives! on Hard mode as Magdalene.", "Cute Baby"],
+  169: ["Defeat Mom's Heart or It Lives! on Hard mode as Eve.", "Crow Baby"],
+  170: ["Defeat Mom's Heart or It Lives! on Hard mode as Judas.", "Dark Baby"],
+  171: ["Defeat Mom's Heart or It Lives! on Hard mode as Cain.", "Glass Baby"],
+  172: ["Defeat Mom's Heart or It Lives! on Hard mode as Lazarus.", "Wrapped Baby"],
+  173: ["Defeat Mom's Heart or It Lives! on Hard mode as Azazel.", "Begotten Baby"],
+  174: ["Defeat Mom's Heart or It Lives! on Hard mode as ???.", "Dead Baby"],
+  175: ["Defeat Mom's Heart or It Lives! on Hard mode as The Lost.", "O"],
+  176: ["Defeat Mom's Heart or It Lives! on Hard mode as Eden.", "Glitch Baby"],
+  177: ["Defeat Mom's Heart or It Lives! on Hard mode as Samson.", "Fighting Baby"],
+  178: ["Pick up three fly items in one run.", "No reward"],
+  179: ["Defeat Hush as Isaac.", "Farting Baby"],
+  180: ["Defeat Hush as Magdalene.", "Purity"],
+  181: ["Defeat Hush as Cain.", "D12"],
+  182: ["Defeat Hush as Judas.", "Betrayal"],
+  183: ["Defeat Hush as ???.", "Fate's Reward"],
+  184: ["Defeat Hush as Eve.", "Athame"],
+  185: ["Defeat Hush as Samson.", "Blind Rage"],
+  186: ["Defeat Hush as Azazel.", "Maw Of The Void"],
+  187: ["Defeat Hush as Lazarus.", "Empty Vessel"],
+  188: ["Defeat Hush as Eden.", "Eden's Blessing"],
+  189: ["Defeat Hush as The Lost.", "Sworn Protector"],
+  190: ["Defeat Hush as Lilith.", "Incubus"],
+  191: ["Defeat Hush as Keeper.", "Keeper starts with a coin and one extra heart container"],
+  192: ["Clear Greed mode as Isaac.", "Lil Chest"],
+  193: ["Clear Greed mode as Magdalene.", "Censer"],
+  194: ["Clear Greed mode as Cain.", "Evil Eye"],
+  195: ["Clear Greed mode as Judas.", "My Shadow"],
+  196: ["Clear Greed mode as ???.", "Cracked Dice"],
+  197: ["Clear Greed mode as Eve.", "Black Feather"],
+  198: ["Clear Greed mode as Samson.", "Lusty Blood"],
+  199: ["Clear Greed mode as Azazel.", "Lilith"],
+  200: ["Clear Greed mode as Lazarus.", "Key Bum"],
+  201: ["Clear Greed mode as Eden.", "GB Bug"],
+  202: ["Clear Greed mode as The Lost.", "Zodiac"],
+  203: ["Clear Greed mode as Lilith.", "Box of Friends"],
+  204: ["Clear Greed mode as Keeper.", "Rib of Greed"],
+  205: ["Defeat Mega Satan as Isaac.", "Cry Baby"],
+  206: ["Defeat Mega Satan as Magdalene.", "Red Baby"],
+  207: ["Defeat Mega Satan as Cain.", "Green Baby"],
+  208: ["Defeat Mega Satan as Judas.", "Brown Baby"],
+  209: ["Defeat Mega Satan as ???.", "Blue Baby"],
+  210: ["Defeat Mega Satan as Eve.", "Lil' Baby"],
+  211: ["Defeat Mega Satan as Samson.", "Rage Baby"],
+  212: ["Defeat Mega Satan as Azazel.", "Black Baby"],
+  213: ["Defeat Mega Satan as Lazarus.", "Long Baby"],
+  214: ["Defeat Mega Satan as Eden.", "Yellow Baby"],
+  215: ["Defeat Mega Satan as The Lost.", "White Baby"],
+  216: ["Defeat Mega Satan as Lilith.", "Big Baby"],
+  217: ["Defeat Mega Satan as Keeper.", "Noose Baby"],
+  218: ["Defeat Isaac as Lilith.", "Rune Bag"],
+  219: ["Defeat ??? as Lilith.", "Cambion Conception"],
+  220: ["Defeat Satan as Lilith.", "Serpent's Kiss"],
+  221: ["Defeat The Lamb as Lilith.", "Succubus"],
+  222: ["Clear Boss Rush as Lilith.", "Immaculate Conception"],
+  223: ["Defeat Mom's Heart or It Lives! on Hard mode as Lilith.", "Goat Head Baby"],
+  224: ["Complete Challenge #21.", "Gold Hearts"],
+  225: ["Complete Challenge #22.", "Get Out of Jail Free Card"],
+  226: ["Complete Challenge #23.", "Golden Bombs"],
+  227: ["Complete Challenge #24.", "Percs! and Addicted!"],
+  228: ["Complete Challenge #25.", "Relax! and ???"],
+  229: ["Complete Challenge #26.", "Poker Chip"],
+  230: ["Complete Challenge #27.", "Stud Finder"],
+  231: ["Complete Challenge #28.", "D8"],
+  232: ["Complete Challenge #29.", "Kidney Stone"],
+  233: ["Complete Challenge #30.", "Blank Rune and Clear Rune"],
+  234: ["Defeat Mom's Heart 10 times.", "Blue Womb"],
+  235: ["Fill the Collection page and unlock all achievements and endings in Rebirth and Afterbirth.", "No reward"],
+  236: ["Defeat Isaac as Keeper.", "Keeper starts with Wooden Nickel"],
+  237: ["Defeat Satan as Keeper.", "Keeper starts with Store Key"],
+  238: ["Defeat ??? as Keeper.", "Deep Pockets"],
+  239: ["Defeat The Lamb as Keeper.", "Karma"],
+  240: ["Clear Boss Rush as Keeper.", "Sticky Nickels"],
+  241: ["Defeat Mom's Heart or It Lives! on Hard mode as Keeper.", "Super Greed Baby"],
+  242: ["Donate 2 coins to the Greed Donation Machine.", "Lucky Pennies"],
+  243: ["Donate 14 coins to the Greed Donation Machine.", "Special hanging shopkeepers"],
+  244: ["Donate 33 coins to the Greed Donation Machine.", "Wooden Nickel"],
+  245: ["Donate 68 coins to the Greed Donation Machine.", "Cain starts with Paper Clip"],
+  246: ["Donate 111 coins to the Greed Donation Machine.", "Higher difficulty in Greed and Greedier mode"],
+  247: ["Donate 234 coins to the Greed Donation Machine.", "Special shopkeepers"],
+  248: ["Donate 439 coins to the Greed Donation Machine.", "Eve starts with Razor Blade"],
+  249: ["Donate 666 coins to the Greed Donation Machine.", "Store Key"],
+  250: ["Donate 879 coins to the Greed Donation Machine.", "The Lost starts with Holy Mantle"],
+  251: ["Donate 1,000 coins to the Greed Donation Machine.", "Keeper"],
+  252: ["Earn every Hard mode completion mark as ???.", "Hive Baby"],
+  253: ["Earn every Hard mode completion mark as Isaac.", "Headless Baby"],
+  254: ["Earn every Hard mode completion mark as Magdalene.", "Colorful Baby"],
+  255: ["Earn every Hard mode completion mark as Eve.", "Whore Baby"],
+  256: ["Earn every Hard mode completion mark as Eden.", "Cracked Baby"],
+  257: ["Earn every Hard mode completion mark as Lazarus.", "Dripping Baby"],
+  258: ["Use Blank Card to activate The Sun.", "Blinding Baby"],
+  259: ["Earn every Hard mode completion mark as Azazel.", "Sucky Baby"],
+  260: ["Earn every Hard mode completion mark as Lilith.", "Dark Baby"],
+  261: ["Earn every Hard mode completion mark as Cain.", "Picky Baby"],
+  262: ["Earn every Hard mode completion mark as Samson.", "Revenge Baby"],
+  263: ["Earn every Hard mode completion mark as Judas.", "Belial Baby"],
+  264: ["Earn every Hard mode completion mark as Keeper.", "Sale Baby"],
+  265: ["Unlock Chapter 4.", "Challenge #21: XXXXXXXXL"],
+  266: ["Unlock Chapter 4.", "Challenge #22: SPEED!"],
+  267: ["Unlock ???, Mom's Heart, and Mr. Mega.", "Challenge #23: Blue Bomber"],
+  268: ["Unlock Sack of Pennies and Mom's Heart and Mr. Mega.", "Challenge #24: PAY TO PLAY"],
+  269: ["Unlock Chapter 4.", "Challenge #25: Have A Heart"],
+  270: ["Defeat Mega Satan once.", "Challenge #26: I RULE!"],
+  271: ["Unlock The Polaroid.", "Challenge #27: BRAINS!"],
+  272: ["Unlock Chapter 4.", "Challenge #28: PRIDE DAY!"],
+  273: ["Unlock Judas and Mom's Heart.", "Challenge #29: Onan's Streak"],
+  274: ["Unlock Chapter 4.", "Challenge #30: The Guardian"],
+  275: ["Donate 999 coins to the Greed Donation Machine.", "No reward"],
+  276: ["Defeat Mega Satan as every non-tainted character.", "Mega Blast"],
+  277: ["Defeat Mega Satan once.", "Challenge #31: Backasswards"],
+  278: ["Unlock Chapter 4.", "Challenge #32: Aprils Fool"],
+  279: ["Unlock Mom's Heart.", "Challenge #33: Pokey Mans"],
+  280: ["Unlock The Negative and defeat Mega Satan.", "Challenge #34: Ultra Hard"],
+  281: ["Unlock A Family Photo.", "Challenge #35: PONG"],
+  282: ["Defeat Delirium as Isaac.", "D infinity"],
+  283: ["Defeat Delirium as Magdalene.", "Eucharist"],
+  284: ["Defeat Delirium as Cain.", "Silver Dollar"],
+  285: ["Defeat Delirium as Judas.", "Shade"],
+  286: ["Defeat Delirium as ???.", "King Baby"],
+  287: ["Defeat Delirium as Samson.", "Bloody Crown"],
+  288: ["Defeat Delirium as Eve.", "Dull Razor"],
+  289: ["Defeat Delirium as Eden.", "Eden's Soul"],
+  290: ["Defeat Delirium as Azazel.", "Dark Prince's Crown"],
+  291: ["Defeat Delirium as Lazarus.", "Compound Fracture"],
+  292: ["Defeat Delirium as Lilith.", "Euthanasia"],
+  293: ["Defeat Delirium as The Lost.", "Holy Card"],
+  294: ["Defeat Delirium as Keeper.", "Crooked Penny"],
+  295: ["Defeat Delirium as Apollyon.", "Void"],
+  296: ["Clear Greedier mode as Isaac.", "D1"],
+  297: ["Clear Greedier mode as Magdalene.", "Glyph of Balance"],
+  298: ["Clear Greedier mode as Cain.", "Sack of Sacks"],
+  299: ["Clear Greedier mode as Judas.", "Eye of Belial"],
+  300: ["Clear Greedier mode as ???.", "Meconium"],
+  301: ["Clear Greedier mode as Samson.", "Stem Cell"],
+  302: ["Clear Greedier mode as Eve.", "Crow Heart"],
+  303: ["Clear Greedier mode as Eden.", "Metronome"],
+  304: ["Clear Greedier mode as Azazel.", "Bat Wing"],
+  305: ["Clear Greedier mode as Lazarus.", "Plan C"],
+  306: ["Clear Greedier mode as Lilith.", "Duality"],
+  307: ["Clear Greedier mode as The Lost.", "Dad's Lost Coin"],
+  308: ["Clear Greedier mode as Keeper.", "Eye of Greed"],
+  309: ["Clear Greedier mode as Apollyon.", "The Black Rune"],
+  310: ["Defeat Isaac as Apollyon.", "Locust of War"],
+  311: ["Defeat Satan as Apollyon.", "Locust of Pestilence"],
+  312: ["Defeat ??? as Apollyon.", "Locust of Famine"],
+  313: ["Defeat The Lamb as Apollyon.", "Locust of Death"],
+  314: ["Clear Boss Rush as Apollyon.", "Locust of Conquest"],
+  315: ["Defeat Hush as Apollyon.", "Hushy"],
+  316: ["Clear Greed mode as Apollyon.", "Brown Nugget"],
+  317: ["Defeat Mega Satan as Apollyon.", "Mort Baby"],
+  318: ["Defeat Mom's Heart or It Lives! on Hard mode as Apollyon.", "Smelter"],
+  319: ["Earn every Hard mode completion mark as Apollyon.", "Apollyon Baby"],
+  320: ["Defeat Hush once.", "The Void"],
+  321: ["Complete a Victory Lap.", "Gulp!"],
+  322: ["Win three runs in a row.", "Ace of Clubs"],
+  323: ["Win five consecutive runs as five different characters.", "Super Special Rocks"],
+  324: ["Encounter every monster in the Bestiary.", "Walking on Sunshine!"],
+  325: ["Take part in Daily Challenges on 31 different days.", "Horf!"],
+  326: ["Defeat The Lamb in under 20 minutes.", "Ace of Diamonds"],
+  327: ["Defeat The Lamb without picking up hearts, coins, or bombs.", "Ace of Spades"],
+  328: ["Restart the game seven times in a row.", "Scared Hearts"],
+  329: ["Clear a floor after the first while keeping only half a heart.", "Ace of Hearts"],
+  330: ["Hold more than 50 items in one run.", "Burp!"],
+  331: ["Complete Challenge #31.", "Lazarus starts with Anemic"],
+  332: ["Complete Challenge #32.", "Magdalene starts with a Full Health pill"],
+  333: ["Complete Challenge #33.", "Charged Key"],
+  334: ["Complete Challenge #34.", "Samson starts with Child's Heart"],
+  335: ["Complete Challenge #35.", "Greed's Gullet"],
+  336: ["Win five Daily Challenges in a row with a positive score.", "Cracked Crown"],
+  337: ["Complete three Victory Laps in one run.", "RERUN"],
+  338: ["Defeat Delirium once.", "Delirious"],
+  339: ["Fill the Collection page and unlock all achievements and endings in Afterbirth+.", "1,000,000% completion milestone"],
+  340: ["Defeat Mega Satan once.", "Apollyon"],
+  341: ["Donate 500 coins to the Greed Donation Machine.", "Greedier mode"],
+  342: ["Defeat Mom's Heart 11 times.", "Burning Basement"],
+  343: ["Defeat Mom's Heart 16 times.", "Flooded Caves"],
+  344: ["Defeat Mom's Heart 21 times.", "Dank Depths"],
+  345: ["Defeat Mom's Heart 30 times.", "Scarred Womb"],
+  346: ["Defeat ??? as three different non-tainted characters.", "New bosses, including Mom's Shadow"],
+  347: ["Defeat ??? as six different characters.", "Additional bosses"],
+  348: ["Defeat Mom's Heart once.", "The Gate"],
+  349: ["Defeat The Gate 20 times.", "Black Hole"],
+  350: ["Destroy 500 rocks.", "Mystery Gift"],
+  351: ["Clear Chapter 1 without taking damage.", "Sprinkler"],
+  352: ["Pick up three fly items in a single run.", "Angry Fly"],
+  353: ["Destroy five rainbow poops.", "Bozo"],
+  354: ["Win seven Daily Challenges.", "Broken Modem"],
+  355: ["Obtain five familiars in a single run.", "Buddy in a Box"],
+  356: ["Defeat Little Horn 20 times.", "Fast Bombs"],
+  357: ["Defeat Delirium once.", "Lil Delirium"],
+  358: ["Pick up batteries 20 times.", "Hairpin"],
+  359: ["Sleep in a bed once.", "Wooden Cross"],
+  360: ["Complete two Victory Laps in the same run.", "Butter!"],
+  361: ["Reach a size of at least 3.00 in one run.", "Huge Growth"],
+  362: ["Use cards 20 times.", "Ancient Recall"],
+  363: ["Add Stop Watch and Broken Watch to your Collection.", "Era Walk"],
+  364: ["Make a combined total of 50 shop purchases and Devil Deals.", "Coupon"],
+  365: ["Clear Chapter 2 without taking damage.", "Telekinesis"],
+  366: ["Use Pandora's Box in the Dark Room.", "Moving Box"],
+  367: ["Pick up two battery items in one run.", "Jumper Cables"],
+  368: ["Clear Chapter 3 without taking damage.", "Leprosy"],
+  369: ["Pick up two technology items in one run.", "Technology Zero"],
+  370: ["Pick up both Key Pieces in the same run.", "Filigree Feather"],
+  371: ["Open a combined total of 20 Golden or Eternal Chests.", "Mr. ME!"],
+  372: ["Defeat each of the five Horsemen at least once.", "7 Seals"],
+  373: ["Defeat the Angel bosses a combined total of 20 times.", "Angelic Prism"],
+  374: ["Clear Chapter 4 without taking damage.", "Pop!"],
+  375: ["Bomb open 50 room doors or Secret Room entrances.", "Door Stop"],
+  376: ["Take 25 Devil Deals.", "Death's List"],
+  377: ["Pick up Blood Clot ten times.", "Haemolacria"],
+  378: ["Pick up ten tears-up items in a single run.", "Lachryphagy"],
+  379: ["Enter six Shops in one run.", "Schoolbag"],
+  380: ["Pick up 25 items from Angel Rooms.", "Trisagion"],
+  381: ["Add The Battery, 9 Volt, and Car Battery to your Collection.", "Extension Cord"],
+  382: ["Pick up Rubber Cement five times.", "Flat Stone"],
+  383: ["Take 50 Devil Deals.", "Sacrificial Altar"],
+  384: ["Die to your own explosive tears.", "Lil Spewer"],
+  385: ["Sleep in beds ten times.", "Blanket"],
+  386: ["Use the Gulp! pill five times in one run.", "Marbles"],
+  387: ["Have three charmed enemies in the same room at once.", "Mystery Egg"],
+  388: ["Have 20 Blue Flies at once in a single run.", "Rotten Penny"],
+  389: ["Stack two sources of homing.", "Baby-Bender"],
+  390: ["Use Mom's Shovel on the dirt mound in the Dark Room.", "The Forgotten"],
+  391: ["Unlock The Forgotten.", "Bone Hearts"],
+  392: ["Defeat Mom's Heart or It Lives! on Hard mode as The Forgotten.", "Marrow"],
+  393: ["Defeat Isaac as The Forgotten.", "Slipped Rib"],
+  394: ["Defeat Satan as The Forgotten.", "Pointy Rib"],
+  395: ["Defeat ??? as The Forgotten.", "Jaw Bone"],
+  396: ["Defeat The Lamb as The Forgotten.", "Brittle Bones"],
+  397: ["Clear Boss Rush as The Forgotten.", "Divorce Papers"],
+  398: ["Defeat Hush as The Forgotten.", "Hallowed Ground"],
+  399: ["Clear Greed mode as The Forgotten.", "Finger Bone"],
+  400: ["Clear Greedier mode as The Forgotten.", "Dad's Ring"],
+  401: ["Defeat Delirium as The Forgotten.", "Book of the Dead"],
+  402: ["Earn every Hard mode completion mark as The Forgotten.", "Bone Baby"],
+  403: ["Defeat Mega Satan as The Forgotten.", "Bound Baby"],
+  404: ["Clear Chapter 4 on Hard mode as Lazarus without dying.", "Bethany"],
+  405: ["Defeat Mother once.", "Jacob & Esau"],
+  406: ["Pick up three astrology items in a single run.", "Planetariums"],
+  407: ["Defeat Hush 3 times.", "Alternate path entrance"],
+  408: ["Bomb the Siren's skull.", "Forgotten Lullaby"],
+  409: ["Defeat Baby Plum 10 times.", "Fruity Plum"],
+  410: ["Let Baby Plum leave the room alive.", "Plum Flute"],
+  411: ["Enter the Corpse.", "Rotten Hearts"],
+  412: ["Defeat every boss in Downpour at least once.", "Dross"],
+  413: ["Defeat every boss in the Mines at least once.", "Ashpit"],
+  414: ["Defeat every boss in the Mausoleum at least once.", "Gehenna"],
+  415: ["Open Mom's Chest.", "Red Key and Cracked Key"],
+  416: ["Defeat Mom's Heart or It Lives! on Hard mode as Bethany.", "Wisp Baby"],
+  417: ["Defeat Isaac as Bethany.", "Book of Virtues"],
+  418: ["Defeat Satan as Bethany.", "Urn of Souls"],
+  419: ["Defeat ??? as Bethany.", "Blessed Penny"],
+  420: ["Defeat The Lamb as Bethany.", "Alabaster Box"],
+  421: ["Clear Boss Rush as Bethany.", "Beth's Faith"],
+  422: ["Clear Greed mode as Bethany.", "Soul Locket"],
+  423: ["Defeat Hush as Bethany.", "Divine Intervention"],
+  424: ["Clear Greedier mode as Bethany.", "Vade Retro"],
+  425: ["Defeat Delirium as Bethany.", "Star of Bethlehem"],
+  426: ["Earn every Hard mode completion mark as Bethany.", "Hope Baby"],
+  427: ["Defeat Mega Satan as Bethany.", "Glowing Baby"],
+  428: ["Defeat Mom's Heart or It Lives! on Hard mode as Jacob & Esau.", "Double Baby"],
+  429: ["Defeat Isaac as Jacob & Esau.", "The Stairway"],
+  430: ["Defeat Satan as Jacob & Esau.", "Red Stew"],
+  431: ["Defeat ??? as Jacob & Esau.", "Birthright"],
+  432: ["Defeat The Lamb as Jacob & Esau.", "Damocles"],
+  433: ["Clear Boss Rush as Jacob & Esau.", "Rock Bottom"],
+  434: ["Clear Greed mode as Jacob & Esau.", "Inner Child"],
+  435: ["Defeat Hush as Jacob & Esau.", "Vanishing Twin"],
+  436: ["Clear Greedier mode as Jacob & Esau.", "Genesis"],
+  437: ["Defeat Delirium as Jacob & Esau.", "Suplex!"],
+  438: ["Earn every Hard mode completion mark as Jacob & Esau.", "Solomon's Baby"],
+  439: ["Defeat Mega Satan as Jacob & Esau.", "Illusion Baby"],
+  440: ["Defeat Mother as Isaac.", "Meat Cleaver"],
+  441: ["Defeat The Beast as Isaac.", "Options?"],
+  442: ["Defeat Mother as Magdalene.", "Yuck Heart"],
+  443: ["Defeat The Beast as Magdalene.", "Candy Heart"],
+  444: ["Defeat Mother as Cain.", "Guppy's Eye"],
+  445: ["Defeat The Beast as Cain.", "A Pound of Flesh"],
+  446: ["Defeat Mother as Judas.", "Akeldama"],
+  447: ["Defeat The Beast as Judas.", "Redemption"],
+  448: ["Defeat Mother as ???.", "Eternal D6"],
+  449: ["Defeat The Beast as ???.", "Montezuma's Revenge"],
+  450: ["Defeat Mother as Eve.", "Bird Cage"],
+  451: ["Defeat The Beast as Eve.", "Cracked Orb"],
+  452: ["Defeat Mother as Samson.", "Bloody Gust"],
+  453: ["Defeat The Beast as Samson.", "Empty Heart"],
+  454: ["Defeat Mother as Azazel.", "Devil's Crown"],
+  455: ["Defeat The Beast as Azazel.", "Lil Abaddon"],
+  456: ["Defeat Mother as Lazarus.", "Tinytoma"],
+  457: ["Defeat The Beast as Lazarus.", "Astral Projection"],
+  458: ["Defeat Mother as Eden.", "'M"],
+  459: ["Defeat The Beast as Eden.", "Everything Jar"],
+  460: ["Defeat Mother as The Lost.", "Lost Soul"],
+  461: ["Defeat The Beast as The Lost.", "Hungry Soul"],
+  462: ["Defeat Mother as Lilith.", "Blood Puppy"],
+  463: ["Defeat The Beast as Lilith.", "C Section"],
+  464: ["Defeat Mother as Keeper.", "Keeper's Sack"],
+  465: ["Defeat The Beast as Keeper.", "Keeper's Box"],
+  466: ["Defeat Mother as Apollyon.", "Lil Portal"],
+  467: ["Defeat The Beast as Apollyon.", "Worm Friend"],
+  468: ["Defeat Mother as The Forgotten.", "Bone Spurs"],
+  469: ["Defeat The Beast as The Forgotten.", "Spirit Shackles"],
+  470: ["Defeat Mother as Bethany.", "Revelation"],
+  471: ["Defeat The Beast as Bethany.", "Jar of Wisps"],
+  472: ["Defeat Mother as Jacob & Esau.", "Magic Skin"],
+  473: ["Defeat The Beast as Jacob & Esau.", "Friend Finder"],
+  474: ["As Isaac, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Isaac"],
+  475: ["As Magdalene, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Magdalene"],
+  476: ["As Cain, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Cain"],
+  477: ["As Judas, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Judas"],
+  478: ["As ???, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted ???"],
+  479: ["As Eve, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Eve"],
+  480: ["As Samson, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Samson"],
+  481: ["As Azazel, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Azazel"],
+  482: ["As Lazarus, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Lazarus"],
+  483: ["As Eden, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Eden"],
+  484: ["As The Lost, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Lost"],
+  485: ["As Lilith, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Lilith"],
+  486: ["As Keeper, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Keeper"],
+  487: ["As Apollyon, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Apollyon"],
+  488: ["As The Forgotten, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Forgotten"],
+  489: ["As Bethany, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Bethany"],
+  490: ["As Jacob & Esau, find and touch your tainted counterpart in the hidden closet at Home.", "Tainted Jacob"],
+  491: ["Defeat The Beast as Tainted Isaac.", "Glitched Crown"],
+  492: ["Defeat The Beast as Tainted Magdalene.", "Belly Jelly"],
+  493: ["Defeat The Beast as Tainted Cain.", "Blue Key"],
+  494: ["Defeat The Beast as Tainted Judas.", "Sanguine Bond"],
+  495: ["Defeat The Beast as Tainted ???.", "The Swarm"],
+  496: ["Defeat The Beast as Tainted Eve.", "Heartbreak"],
+  497: ["Defeat The Beast as Tainted Samson.", "Larynx"],
+  498: ["Defeat The Beast as Tainted Azazel.", "Azazel's Rage"],
+  499: ["Defeat The Beast as Tainted Lazarus.", "Salvation"],
+  500: ["Defeat The Beast as Tainted Eden.", "TMTRAINER"],
+  501: ["Defeat The Beast as Tainted Lost.", "Sacred Orb"],
+  502: ["Defeat The Beast as Tainted Lilith.", "Twisted Pair"],
+  503: ["Defeat The Beast as Tainted Keeper.", "Strawman"],
+  504: ["Defeat The Beast as Tainted Apollyon.", "Echo Chamber"],
+  505: ["Defeat The Beast as Tainted Forgotten.", "Isaac's Tomb"],
+  506: ["Defeat The Beast as Tainted Bethany.", "Vengeful Spirit"],
+  507: ["Defeat The Beast as Tainted Jacob.", "Esau Jr."],
+  508: ["Unlock It Lives! and Bethany and Blood Bag.", "Challenge #37: Bloody Mary"],
+  509: ["Unlock It Lives! and Urn of Souls and Maggy's Faith.", "Challenge #38: Baptism by Fire"],
+  510: ["Defeat Mother once.", "Challenge #39: Isaac's Awakening"],
+  511: ["Unlock Jacob & Esau.", "Challenge #40: Seeing Double"],
+  512: ["Unlock It Lives! and Marbles.", "Challenge #41: Pica Run"],
+  513: ["Unlock Tainted Forgotten.", "Challenge #42: Hot Potato"],
+  514: ["Unlock Tainted Cain.", "Challenge #43: Cantripped!"],
+  515: ["Unlock Tainted Jacob.", "Challenge #44: Red Redemption"],
+  516: ["Unlock Tainted Eden.", "Challenge #45: DELETE THIS"],
+  517: ["Complete Challenge #36.", "Dirty Mind"],
+  518: ["Complete Challenge #37.", "Sigil of Baphomet"],
+  519: ["Complete Challenge #38.", "Purgatory"],
+  520: ["Complete Challenge #39.", "Spirit Sword"],
+  521: ["Complete Challenge #40.", "Broken Glasses"],
+  522: ["Complete Challenge #41.", "Ice Cube"],
+  523: ["Get an item from a Battery Bum five times.", "Charged Penny"],
+  524: ["Clear Greedier mode as Tainted Lost.", "0 - The Fool"],
+  525: ["Clear Greedier mode as Tainted Judas.", "The Magician"],
+  526: ["Clear Greedier mode as Tainted Lilith.", "The High Priestess"],
+  527: ["Clear Greedier mode as Tainted Eve.", "The Empress"],
+  528: ["Clear Greedier mode as Tainted ???.", "The Emperor"],
+  529: ["Clear Greedier mode as Tainted Bethany.", "The Hierophant"],
+  530: ["Clear Greedier mode as Tainted Magdalene.", "The Lovers"],
+  531: ["Complete Challenge #42.", "VII – The Chariot?"],
+  532: ["Complete Challenge #43.", "VIII – Justice?"],
+  533: ["Complete Challenge #44.", "IX – The Hermit?"],
+  534: ["Clear Greedier mode as Tainted Cain.", "Wheel of Fortune"],
+  535: ["Clear Greedier mode as Tainted Samson.", "Strength"],
+  536: ["Clear Greedier mode as Tainted Keeper.", "The Hanged Man"],
+  537: ["Clear Greedier mode as Tainted Forgotten.", "Death"],
+  538: ["Complete Challenge #45.", "XIV – Temperance?"],
+  539: ["Clear Greedier mode as Tainted Azazel.", "The Devil"],
+  540: ["Clear Greedier mode as Tainted Apollyon.", "The Tower"],
+  541: ["Clear Greedier mode as Tainted Isaac.", "The Stars"],
+  542: ["Clear Greedier mode as Tainted Jacob.", "The Sun and the Moon"],
+  543: ["Clear Greedier mode as Tainted Lazarus.", "Judgement"],
+  544: ["Clear Greedier mode as Tainted Eden.", "The World"],
+  545: ["Kill ten Battery Bums.", "Old Capacitor"],
+  546: ["Break the minecart and defeat Hornfel before he gets away.", "Brimstone Bombs"],
+  547: ["Earn every Hard mode completion mark as every non-tainted character.", "Mega Mush"],
+  548: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Isaac.", "Mom's Lock"],
+  549: ["Defeat Mother as Tainted Isaac.", "Dice Bag"],
+  550: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Magdalene.", "Holy Crown"],
+  551: ["Defeat Mother as Tainted Magdalene.", "Mother's Kiss"],
+  552: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Cain.", "Gilded Key"],
+  553: ["Defeat Mother as Tainted Cain.", "Lucky Sack"],
+  554: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Judas.", "Your Soul"],
+  555: ["Defeat Mother as Tainted Judas.", "Number Magnet"],
+  556: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted ???.", "Dingle Berry"],
+  557: ["Defeat Mother as Tainted ???.", "Ring Cap"],
+  558: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Eve.", "Strange Key"],
+  559: ["Defeat Mother as Tainted Eve.", "Lil Clot"],
+  560: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Samson.", "Temporary Tattoo"],
+  561: ["Defeat Mother as Tainted Samson.", "Swallowed M80"],
+  562: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Azazel.", "Wicked Crown"],
+  563: ["Defeat Mother as Tainted Azazel.", "Azazel's Stump"],
+  564: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Lazarus.", "Torn Pocket"],
+  565: ["Defeat Mother as Tainted Lazarus.", "Torn Card"],
+  566: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Eden.", "Nuh Uh!"],
+  567: ["Defeat Mother as Tainted Eden.", "Modeling Clay"],
+  568: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Lost.", "Kid's Drawing"],
+  569: ["Defeat Mother as Tainted Lost.", "Crystal Key"],
+  570: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Lilith.", "The Twins"],
+  571: ["Defeat Mother as Tainted Lilith.", "Adoption Papers"],
+  572: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Keeper.", "Keeper's Bargain"],
+  573: ["Defeat Mother as Tainted Keeper.", "Cursed Penny"],
+  574: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Apollyon.", "Cricket Leg"],
+  575: ["Defeat Mother as Tainted Apollyon.", "Apollyon's Best Friend"],
+  576: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Forgotten.", "Polished Bone"],
+  577: ["Defeat Mother as Tainted Forgotten.", "Hollow Heart"],
+  578: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Bethany.", "Expansion Pack"],
+  579: ["Defeat Mother as Tainted Bethany.", "Beth's Essence"],
+  580: ["Defeat Isaac, ???, Satan, and The Lamb as Tainted Jacob.", "RC Remote"],
+  581: ["Defeat Mother as Tainted Jacob.", "Found Soul"],
+  582: ["Spend more than 40 coins in a single Shop.", "Member Card"],
+  583: ["Hold 99 coins in one run, then spend them all.", "Golden Razor"],
+  584: ["Defeat Delirium as Tainted Isaac.", "Spindown Dice"],
+  585: ["Defeat Delirium as Tainted Magdalene.", "Hypercoagulation"],
+  586: ["Defeat Delirium as Tainted Cain.", "Bag of Crafting"],
+  587: ["Defeat Delirium as Tainted Judas.", "Dark Arts"],
+  588: ["Defeat Delirium as Tainted ???.", "IBS"],
+  589: ["Defeat Delirium as Tainted Eve.", "Sumptorium"],
+  590: ["Defeat Delirium as Tainted Samson.", "Berserk!"],
+  591: ["Defeat Delirium as Tainted Azazel.", "Hemoptysis"],
+  592: ["Defeat Delirium as Tainted Lazarus.", "Flip"],
+  593: ["Defeat Delirium as Tainted Eden.", "Corrupted Data"],
+  594: ["Defeat Delirium as Tainted Lost.", "Ghost Bombs"],
+  595: ["Defeat Delirium as Tainted Lilith.", "Gello"],
+  596: ["Defeat Delirium as Tainted Keeper.", "Keeper's Kin"],
+  597: ["Defeat Delirium as Tainted Apollyon.", "Abyss"],
+  598: ["Defeat Delirium as Tainted Forgotten.", "Decap Attack"],
+  599: ["Defeat Delirium as Tainted Bethany.", "Lemegeton"],
+  600: ["Defeat Delirium as Tainted Jacob.", "Anima Sola"],
+  601: ["Defeat Mega Satan as Tainted Isaac.", "Mega Chest"],
+  602: ["Defeat Mega Satan as Tainted Magdalene.", "Queen of Hearts"],
+  603: ["Defeat Mega Satan as Tainted Cain.", "Gold Pill"],
+  604: ["Defeat Mega Satan as Tainted Judas.", "Black Sack"],
+  605: ["Defeat Mega Satan as Tainted ???.", "Charming Poop"],
+  606: ["Defeat Mega Satan as Tainted Eve.", "Horse Pill"],
+  607: ["Defeat Mega Satan as Tainted Samson.", "Crane Game"],
+  608: ["Defeat Mega Satan as Tainted Azazel.", "Hell Game"],
+  609: ["Defeat Mega Satan as Tainted Lazarus.", "Wooden Chest"],
+  610: ["Defeat Mega Satan as Tainted Eden.", "Wild Card"],
+  611: ["Defeat Mega Satan as Tainted Lost.", "Haunted Chest"],
+  612: ["Defeat Mega Satan as Tainted Lilith.", "Fool's Gold"],
+  613: ["Defeat Mega Satan as Tainted Keeper.", "Golden Penny"],
+  614: ["Defeat Mega Satan as Tainted Apollyon.", "Rotten Beggar"],
+  615: ["Defeat Mega Satan as Tainted Forgotten.", "Golden Battery"],
+  616: ["Defeat Mega Satan as Tainted Bethany.", "Confessional"],
+  617: ["Defeat Mega Satan as Tainted Jacob.", "Golden Trinket"],
+  618: ["Clear Boss Rush and defeat Hush as Tainted Isaac.", "Soul of Isaac"],
+  619: ["Clear Boss Rush and defeat Hush as Tainted Magdalene.", "Soul of Magdalene"],
+  620: ["Clear Boss Rush and defeat Hush as Tainted Cain.", "Soul of Cain"],
+  621: ["Clear Boss Rush and defeat Hush as Tainted Judas.", "Soul of Judas"],
+  622: ["Clear Boss Rush and defeat Hush as Tainted ???.", "Soul of ???"],
+  623: ["Clear Boss Rush and defeat Hush as Tainted Eve.", "Soul of Eve"],
+  624: ["Clear Boss Rush and defeat Hush as Tainted Samson.", "Soul of Samson"],
+  625: ["Clear Boss Rush and defeat Hush as Tainted Azazel.", "Soul of Azazel"],
+  626: ["Clear Boss Rush and defeat Hush as Tainted Lazarus.", "Soul of Lazarus"],
+  627: ["Clear Boss Rush and defeat Hush as Tainted Eden.", "Soul of Eden"],
+  628: ["Clear Boss Rush and defeat Hush as Tainted Lost.", "Soul of the Lost"],
+  629: ["Clear Boss Rush and defeat Hush as Tainted Lilith.", "Soul of Lilith"],
+  630: ["Clear Boss Rush and defeat Hush as Tainted Keeper.", "Soul of the Keeper"],
+  631: ["Clear Boss Rush and defeat Hush as Tainted Apollyon.", "Soul of Apollyon"],
+  632: ["Clear Boss Rush and defeat Hush as Tainted Forgotten.", "Soul of the Forgotten"],
+  633: ["Clear Boss Rush and defeat Hush as Tainted Bethany.", "Soul of Bethany"],
+  634: ["Clear Boss Rush and defeat Hush as Tainted Jacob.", "Soul of Jacob and Esau"],
+  635: ["Defeat Mother once.", "The Strange Door"],
+  636: ["Earn every Hard mode completion mark as every character.", "Death Certificate"],
+  637: ["Unlock every other achievement and collect every item.", "No reward"],
+  638: ["Play an online run.", "No reward"],
+  639: ["Win an online run.", "No reward"],
+  640: ["Win an online Daily Challenge.", "No reward"],
+  641: ["Defeat Mom in a regular run to enable in-game item descriptions.", "No reward"],
+};
+
+function tr(zh, en) {
+  return language === 'en' ? en : zh;
+}
+function achievementName(item) {
+  return tr(item.title, item.en || item.title);
+}
+function groupName(name) {
+  const tainted = name.startsWith('堕化') ? groupEnglish[name.slice(2)] : '';
+  return tr(name, groupEnglish[name] || (tainted ? 'Tainted ' + tainted.replace(/^The /, '') : name));
+}
+function achievementText(item, field) {
+  const original = item[field] || '';
+  if (language !== 'en') return original;
+  if (field === 'reward' && original === '无奖励') return 'No reward';
+  return achievementEnglish[item.id]?.[field === 'cond' ? 0 : 1] || original;
+}
+function achievementTextHtml(item, field) {
+  const display = achievementText(item, field);
+  if (display !== item[field]) return esc(display);
+  const html = field === 'cond' && item.type === '解锁挑战' ? linkChallengeCond(display) : autoLink(display);
+  return language === 'en' ? '<span lang="zh-CN">' + html + '</span>' : html;
+}
+
+const interfaceEnglish = [
+  ['title', 'The Binding of Isaac Achievement Checklist'],
+  ['.brand h1', 'Isaac Achievement Checklist'],
+  ['.brand .subtitle', 'Track unlocks and completion marks'],
+  ['#collapseBtn', 'Settings', 'title'],
+  ['#themeBtn', 'Switch theme', 'title'],
+  ['#importAchBtn .tb-text', 'Import'],
+  ['#importAchBtn', 'Import achievements from Steam or a save file', 'title'],
+  ['#priPresetBtn .tb-text', 'Priority presets'],
+  ['#priPresetBtn', 'Import or export priority presets', 'title'],
+  ['#resetBtn .tb-text', 'Reset'],
+  ['#resetBtn', 'Reset all completion progress', 'title'],
+  ['.feedback-btn .tb-text', 'Feedback'],
+  ['#backToViewBtn .tb-text', 'Back to last position'],
+  ['#backToViewBtn', 'Back to last position', 'title'],
+  ['.overall-label', 'Overall progress'],
+  ['#search', 'Search achievements, rewards, or requirements…', 'placeholder'],
+  ['#hideDoneBtn', 'Show or hide completed achievements', 'title'],
+  ['#priFilter', 'Filter by priority', 'title'],
+  ['#priFilter option:nth-child(1)', 'All priorities'],
+  ['#priFilter option:nth-child(2)', 'Priority'],
+  ['#priFilter option:nth-child(3)', 'Suggested'],
+  ['#priFilter option:nth-child(4)', 'No priority'],
+  ['#searchResultsClose', 'Back to checklist'],
+  ['#presetPanel .preset-title', '🎯 Priority presets'],
+  ['#presetClose', 'Close', 'title'],
+  ['#presetPanel .preset-desc', 'Copy your priority code to share it, or paste a code to apply a preset.'],
+  ['#presetExportBtn .button-label', 'Generate priority code'],
+  ['#presetCode', 'Paste a priority code (ISAACPRI1-…)', 'placeholder'],
+  ['#presetImportCodeBtn .button-label', 'Import code'],
+  ['#presetClearBtn .button-label', 'Clear my priorities'],
+  ['#importAchPanel .preset-title', '🎮 Import achievements'],
+  ['#importAchClose', 'Close', 'title'],
+  ['#importAchPanel .preset-desc', 'Import a save to mark completed achievements and show progress for counter goals.'],
+  ['#saveDropzone .dz-text', 'Choose a save file or drag it here'],
+  ['#saveDropzone .dz-hint', 'Supports .dat saves such as rep_persistentgamedata1.dat'],
+  ['#saveImportBtn .button-label', 'Choose file…'],
+  ['#saveLocation summary', 'Find Windows saves'],
+  ['#saveAccountLabel', 'SteamID64, numeric profile URL, or userdata folder number (optional)'],
+  ['#saveAccount', 'Example: 76561198015863878', 'placeholder'],
+  ['#savePath', 'Windows save folder', 'aria-label'],
+  ['#copySavePath', 'Copy folder path'],
+  ['#savePathHelp', 'Paste the path into File Explorer or the file picker address bar. If Steam is installed elsewhere, open userdata under that installation.'],
+  ['.steam-sep', 'or'],
+  ['.steam-sep + .preset-desc', 'Import Steam progress. Set Game details to Public in Steam first.'],
+  ['#steamInput', 'Steam profile URL or 17-digit SteamID64', 'placeholder'],
+  ['.steam-options .button-label', 'Keep completed achievements (merge)'],
+  ['.steam-remember label .button-label', 'Remember my Steam account'],
+  ['#steamRememberClear', 'Forget account'],
+  ['.steam-hint', 'Remembered accounts are filled in automatically next time.'],
+  ['#steamImportBtn .button-label', 'Import from Steam'],
+  ['#codexFab', 'Items'],
+  ['#codexFab', 'Open item catalog', 'aria-label'],
+  ['.codex-panel', 'Item catalog', 'aria-label'],
+  ['#codexSearch', 'Search by name, ID, alias, or pinyin', 'placeholder'],
+  ['#codexClose', 'Close', 'aria-label'],
+  ['#codexSort option[value="letter"]', 'Alphabetical'],
+  ['#codexSort option[value="id"]', 'By ID'],
+  ['#codexQuality button[data-q=""]', 'All'],
+  ['#codexTag', 'Filter by tag', 'aria-label'],
+  ['#codexPool', 'Filter by item pool', 'aria-label'],
+].map(([selector, en, attribute]) => {
+  const element = document.querySelector(selector);
+  const zh = attribute ? element.getAttribute(attribute) : element.textContent;
+  return { element, zh, en, attribute };
+});
+
+function applyInterfaceLanguage() {
+  document.documentElement.lang = language;
+  for (const { element, zh, en, attribute } of interfaceEnglish) {
+    if (attribute) element.setAttribute(attribute, tr(zh, en));
+    else element.textContent = tr(zh, en);
+  }
+  const button = document.getElementById('languageBtn');
+  button.lang = tr('en', 'zh-CN');
+  button.textContent = tr('English', '中文');
+  document.getElementById('hideDoneLabel').textContent = hideDone
+    ? tr('显示已完成', 'Show completed') : tr('隐藏已完成', 'Hide completed');
+  updateThemeLabel(themeMode);
+  updateSavePath();
+}
+
+document.getElementById('languageBtn').addEventListener('click', () => {
+  language = tr('en', 'zh-CN');
+  try { localStorage.setItem(LANGUAGE_KEY, language); } catch { /* Keep it for this visit. */ }
+  hidePriMenu();
+  applyInterfaceLanguage();
+  renderTabs();
+  renderAll();
+  refreshCodexLanguage();
+  applyFilter({ jump: false });
+});
+
 /* ---------- 工具 ---------- */
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1219,7 +2030,7 @@ function restoreView(state) {
   const hbtn = document.getElementById('hideDoneBtn');
   const hlabel = document.getElementById('hideDoneLabel');
   if (hbtn) hbtn.classList.toggle('active', hideDone);
-  if (hlabel) hlabel.textContent = hideDone ? '显示已完成' : '隐藏已完成';
+  if (hlabel) hlabel.textContent = hideDone ? tr('显示已完成', 'Show completed') : tr('隐藏已完成', 'Hide completed');
   if (state.tab && TAB_DEFS.some(t => t.id === state.tab)) {
     currentTab = state.tab;
     ensureActivePanel();
@@ -1404,7 +2215,7 @@ function priSort(a, b) {
   const rb = rank[pb] !== undefined ? rank[pb] : 2;
   if (ra !== rb) return ra - rb;
   // 同优先级按名称排序（中文按拼音，英文/数字排后）
-  return String(a.title).localeCompare(String(b.title), 'zh');
+  return achievementName(a).localeCompare(achievementName(b), language);
 }
 
 function buildGroups(tab) {
@@ -1459,7 +2270,7 @@ function renderTabs() {
     b.innerHTML = '<span class="tab-label"></span>' +
       '<span class="tab-prog"><span class="tab-prog-fill" id="tp-' + tab.id + '"></span></span>' +
       '<span class="tab-count" id="tc-' + tab.id + '"></span>';
-    b.querySelector('.tab-label').textContent = tab.label;
+    b.querySelector('.tab-label').textContent = tr(tab.label, tabEnglish[tab.id][0]);
     tabsEl.appendChild(b);
   }
 }
@@ -1476,7 +2287,7 @@ function progressHtml(id) {
   const shownCur = Math.min(p.cur, p.target);
   const pct = done ? 100 : Math.round(shownCur / p.target * 100);
   const label = done
-    ? '已达成'
+    ? tr('已达成', 'Goal reached')
     : shownCur + ' / ' + p.target + '（' + pct + '%）';
   return '<div class="ach-progress"><div class="ach-progress-fill" style="width:' + pct + '%"></div></div>' +
     '<div class="ach-progress-text">' + label + '</div>';
@@ -1485,8 +2296,8 @@ function progressHtml(id) {
 function cardHtml(item) {
   const pri = effectivePri(item);
   const priCls = pri === '优先' ? 'pri-important' : (pri === '推荐' ? 'pri-recommend' : '');
-  const badge = pri === '优先' ? '<span class="pri-badge b-pri">优先</span>'
-    : (pri === '推荐' ? '<span class="pri-badge b-rec">推荐</span>' : '');
+  const badge = pri === '优先' ? '<span class="pri-badge b-pri">' + tr('优先', 'Priority') + '</span>'
+    : (pri === '推荐' ? '<span class="pri-badge b-rec">' + tr('推荐', 'Suggested') + '</span>' : '');
   // 图标优先级：自定义上传 > 堕化角色头像 > 奖励道具图标 > 成就图标 > 首字占位
   let img, hasImg = false;
   if (state.icons[item.id]) {
@@ -1502,11 +2313,11 @@ function cardHtml(item) {
     img = '<div class="atlas-icon" style="' + iconStyle('atlas-ach', cellOf(POS[item.id], 64, 20)) + '"></div>';
     hasImg = true;
   } else {
-    img = '<div class="icon-placeholder ' + gradClass(+item.id) + '">' + esc(item.title.slice(0,1)) + '</div>';
+    img = '<div class="icon-placeholder ' + gradClass(+item.id) + '">' + esc(achievementName(item).slice(0, 1)) + '</div>';
   }
   const reward = item.reward === '无奖励'
-    ? '<span class="no-reward">无奖励</span>'
-    : autoLink(item.reward);
+    ? '<span class="no-reward">' + tr('无奖励', 'No reward') + '</span>'
+    : achievementTextHtml(item, 'reward');
   return '<div class="ach-card ' + priCls + '" data-id="' + item.id + '">' +
     '<div class="ach-icon-wrap">' +
       '<div class="ach-icon' + (hasImg ? ' has-img' : '') + '">' +
@@ -1515,14 +2326,14 @@ function cardHtml(item) {
       badge +
     '</div>' +
     '<div class="ach-body">' +
-      '<div class="ach-title"><a class="ach-title-text" href="' + titleHref(item) + '" data-wiki="1" rel="noopener">' + esc(item.title) + '</a></div>' +
-      '<div class="ach-reward">奖励：' + reward + '</div>' +
-      '<div class="ach-cond">' + (item.type === '解锁挑战' ? linkChallengeCond(item.cond) : autoLink(item.cond)) + '</div>' +
+      '<div class="ach-title"><a class="ach-title-text" href="' + titleHref(item) + '" data-wiki="1" rel="noopener">' + esc(achievementName(item)) + '</a></div>' +
+      '<div class="ach-reward">' + tr('奖励：', 'Reward: ') + reward + '</div>' +
+      '<div class="ach-cond">' + achievementTextHtml(item, 'cond') + '</div>' +
       progressHtml(item.id) +
     '</div>' +
     '<div class="ach-side">' +
-      '<button class="pri-btn" data-pri-btn title="自定义优先级" aria-label="设置优先级">⚑</button>' +
-      '<button class="ach-check" aria-label="标记完成"></button>' +
+      '<button class="pri-btn" data-pri-btn title="' + tr('自定义优先级', 'Set priority') + '" aria-label="' + tr('设置优先级', 'Set priority') + '">⚑</button>' +
+      '<button class="ach-check" aria-label="' + tr('标记完成', 'Toggle completion') + '"></button>' +
     '</div>' +
   '</div>';
 }
@@ -1539,7 +2350,7 @@ function renderPanel(tab) {
 
   const desc = document.createElement('div');
   desc.className = 'panel-desc';
-  desc.textContent = tab.desc;
+  desc.textContent = tr(tab.desc, tabEnglish[tab.id][1]);
   panel.appendChild(desc);
 
   for (const [gname, items] of buildGroups(tab)) {
@@ -1553,9 +2364,9 @@ function renderPanel(tab) {
       nm.className = 'group-name';
       const av = document.createElement('span');
       av.className = 'group-avatar';
-      av.textContent = gname === '全角色' ? '★' : gname.slice(0, 1);
+      av.textContent = gname === '全角色' ? '★' : groupName(gname).slice(0, 1);
       nm.appendChild(av);
-      nm.appendChild(document.createTextNode(gname));
+      nm.appendChild(document.createTextNode(groupName(gname)));
       hdr.appendChild(nm);
       const bar = document.createElement('div');
       bar.className = 'group-bar';
@@ -1568,7 +2379,7 @@ function renderPanel(tab) {
       const collapseG = document.createElement('button');
       collapseG.className = 'group-collapse';
       collapseG.type = 'button';
-      collapseG.title = '收起 / 展开该分栏';
+      collapseG.title = tr('收起 / 展开该分栏', 'Collapse or expand group');
       collapseG.innerHTML = '<span class="gc-ico">▾</span>';
       hdr.appendChild(collapseG);
       sec.appendChild(hdr);
@@ -1583,7 +2394,7 @@ function renderPanel(tab) {
   const empty = document.createElement('div');
   empty.className = 'empty-state';
   empty.id = 'empty-' + tab.id;
-  empty.innerHTML = '<div class="e-icon">🔎</div>没有找到匹配的成就，试试其他关键词吧';
+  empty.innerHTML = '<div class="e-icon">🔎</div>' + tr('没有找到匹配的成就，试试其他关键词吧', 'No matching achievements. Try another search.');
   panel.appendChild(empty);
 
   main.appendChild(panel);
@@ -1708,10 +2519,10 @@ function showPriMenu(card, ev) {
   const menu = document.createElement('div');
   menu.className = 'pri-menu';
   menu.innerHTML =
-    '<div class="pri-menu-title">设置优先级</div>' +
-    '<button class="pri-menu-item opt-pri' + (cur === '优先' ? ' active' : '') + '" data-v="优先"><span class="pm-dot"></span>优先<span class="pm-hint">红色背景</span></button>' +
-    '<button class="pri-menu-item opt-rec' + (cur === '推荐' ? ' active' : '') + '" data-v="推荐"><span class="pm-dot"></span>推荐<span class="pm-hint">黄色背景</span></button>' +
-    '<button class="pri-menu-item opt-none' + (cur === '' ? ' active' : '') + '" data-v=""><span class="pm-dot"></span>无优先级</button>';
+    '<div class="pri-menu-title">' + tr('设置优先级', 'Set priority') + '</div>' +
+    '<button class="pri-menu-item opt-pri' + (cur === '优先' ? ' active' : '') + '" data-v="优先"><span class="pm-dot"></span>' + tr('优先', 'Priority') + '<span class="pm-hint">' + tr('红色背景', 'Red') + '</span></button>' +
+    '<button class="pri-menu-item opt-rec' + (cur === '推荐' ? ' active' : '') + '" data-v="推荐"><span class="pm-dot"></span>' + tr('推荐', 'Suggested') + '<span class="pm-hint">' + tr('黄色背景', 'Yellow') + '</span></button>' +
+    '<button class="pri-menu-item opt-none' + (cur === '' ? ' active' : '') + '" data-v=""><span class="pm-dot"></span>' + tr('无优先级', 'No priority') + '</button>';
   menu.style.top = '0px';
   menu.style.left = '0px';
   document.body.appendChild(menu);
@@ -1759,13 +2570,13 @@ function updateCardPri(card, id) {
   if (pri === '优先') {
     card.classList.remove('pri-recommend');
     card.classList.add('pri-important');
-    if (!badge) card.querySelector('.ach-icon-wrap').insertAdjacentHTML('beforeend', '<span class="pri-badge b-pri">优先</span>');
-    else { badge.textContent = '优先'; badge.className = 'pri-badge b-pri'; }
+    if (!badge) card.querySelector('.ach-icon-wrap').insertAdjacentHTML('beforeend', '<span class="pri-badge b-pri">' + tr('优先', 'Priority') + '</span>');
+    else { badge.textContent = tr('优先', 'Priority'); badge.className = 'pri-badge b-pri'; }
   } else if (pri === '推荐') {
     card.classList.remove('pri-important');
     card.classList.add('pri-recommend');
-    if (!badge) card.querySelector('.ach-icon-wrap').insertAdjacentHTML('beforeend', '<span class="pri-badge b-rec">推荐</span>');
-    else { badge.textContent = '推荐'; badge.className = 'pri-badge b-rec'; }
+    if (!badge) card.querySelector('.ach-icon-wrap').insertAdjacentHTML('beforeend', '<span class="pri-badge b-rec">' + tr('推荐', 'Suggested') + '</span>');
+    else { badge.textContent = tr('推荐', 'Suggested'); badge.className = 'pri-badge b-rec'; }
   } else {
     card.classList.remove('pri-important', 'pri-recommend');
     if (badge) badge.remove();
@@ -1877,7 +2688,8 @@ async function runMainSearch(opts) {
   const bySearch = searchExact(idx, q);
   const qLower = q.toLowerCase();
   const byText = DATA.filter(d =>
-    (d.title + ' ' + d.reward + ' ' + d.cond + ' ' + (d.char || '')).toLowerCase().includes(qLower));
+    [d.title, d.en, d.reward, d.cond, d.char, d.char && groupName(d.char),
+      ...Object.values(achievementEnglish[d.id] || [])].join(' ').toLowerCase().includes(qLower));
   const seen = new Set(bySearch.map(i => +i.id));
   for (const d of byText) {
     if (!seen.has(+d.id)) { seen.add(+d.id); bySearch.push({ id: +d.id, kind: 'achievement' }); }
@@ -1892,22 +2704,25 @@ async function runMainSearch(opts) {
   main.hidden = true;
   box.hidden = false;
   document.getElementById('searchResultsTitle').textContent =
-    '搜索「' + q + '」：精确 ' + exact.length + ' · 模糊 ' + fuzzy.length;
+    tr(
+      '搜索「' + q + '」：精确 ' + exact.length + ' · 模糊 ' + fuzzy.length,
+      'Results for “' + q + '”: ' + exact.length + ' exact · ' + fuzzy.length + ' fuzzy'
+    );
 
-  document.getElementById('searchResultsExact').innerHTML = '<h3>精确查找</h3>' +
+  document.getElementById('searchResultsExact').innerHTML = '<h3>' + tr('精确查找', 'Exact matches') + '</h3>' +
     (exact.length ? exact.map(i => {
       const d = byId.get(+i.id);
       return '<div class="search-exact-item">' +
         '<div class="codex-icon" style="' + achIconStyle(d) + '"></div>' +
-        '<a class="ach-title-text" href="' + titleHref(d) + '" data-wiki="1">' + esc(d.title) + '</a>' +
-        '<span class="codex-sub">' + esc(d.reward || '') + '</span></div>';
-    }).join('') : '<div class="codex-sub">无</div>');
+        '<a class="ach-title-text" href="' + titleHref(d) + '" data-wiki="1">' + esc(achievementName(d)) + '</a>' +
+        '<span class="codex-sub">' + achievementTextHtml(d, 'reward') + '</span></div>';
+    }).join('') : '<div class="codex-sub">' + tr('无', 'None') + '</div>');
 
-  document.getElementById('searchResultsFuzzy').innerHTML = '<h3>模糊搜索（图标即结果）</h3>' +
+  document.getElementById('searchResultsFuzzy').innerHTML = '<h3>' + tr('模糊搜索（图标即结果）', 'Fuzzy matches') + '</h3>' +
     '<div class="search-fuzzy-grid">' + (fuzzy.length ? fuzzy.map(i => {
       const d = byId.get(+i.id);
       return '<div class="codex-icon" style="' + achIconStyle(d) + '" data-ach="' + d.id + '"></div>';
-    }).join('') : '<div class="codex-sub">无</div>') +
+    }).join('') : '<div class="codex-sub">' + tr('无', 'None') + '</div>') +
     '<div class="search-fuzzy-detail" hidden></div></div>';
 }
 
@@ -1925,7 +2740,7 @@ document.getElementById('searchResultsFuzzy').addEventListener('click', (e) => {
   if (box.dataset.ach === el.dataset.ach && !box.hidden) { box.hidden = true; return; }  // 再点一次收起
   box.dataset.ach = el.dataset.ach;
   box.hidden = false;
-  box.innerHTML = '<strong>' + esc(d.title) + '</strong>　' + esc(d.cond || '');
+  box.innerHTML = '<strong>' + esc(achievementName(d)) + '</strong>　' + achievementTextHtml(d, 'cond');
 });
 
 function applyFilter(opts) {
@@ -1977,10 +2792,10 @@ if (hideDoneBtn) {
   hideDoneBtn.addEventListener('click', () => {
     hideDone = !hideDone;
     hideDoneBtn.classList.toggle('active', hideDone);
-    hideDoneLabel.textContent = hideDone ? '显示已完成' : '隐藏已完成';
+    hideDoneLabel.textContent = hideDone ? tr('显示已完成', 'Show completed') : tr('隐藏已完成', 'Hide completed');
     applyFilter();
     updateProgress();
-    toast(hideDone ? '已隐藏已完成的成就' : '已显示全部成就');
+    toast(hideDone ? tr('已隐藏已完成的成就', 'Completed achievements hidden.') : tr('已显示全部成就', 'Showing all achievements.'));
   });
 }
 
@@ -2003,8 +2818,8 @@ tabsEl.addEventListener('click', (e) => {
 function updateThemeLabel(t) {
   const resolved = document.documentElement.dataset.theme;
   const isMobile = window.innerWidth <= 760;
-  const modeName = t === 'auto' ? (resolved === 'dark' ? '自动·深色' : '自动·浅色') : (t === 'dark' ? '深色' : '浅色');
-  const label = isMobile ? (t === 'auto' ? '自动' : modeName) : modeName;
+  const modeName = t === 'auto' ? (resolved === 'dark' ? tr('自动·深色', 'Auto · Dark') : tr('自动·浅色', 'Auto · Light')) : (t === 'dark' ? tr('深色', 'Dark') : tr('浅色', 'Light'));
+  const label = isMobile ? (t === 'auto' ? tr('自动', 'Auto') : modeName) : modeName;
   document.getElementById('themeLabel').textContent = label;
 }
 document.getElementById('themeBtn').addEventListener('click', () => {
@@ -2053,12 +2868,12 @@ tabsEl.addEventListener('click', (e) => {
 });
 
 document.getElementById('resetBtn').addEventListener('click', () => {
-  if (!confirm('确定要清空所有完成进度吗？此操作不可恢复。')) return;
+  if (!confirm(tr('确定要清空所有完成进度吗？此操作不可恢复。', 'Reset all completion progress? This cannot be undone.'))) return;
   state.completed.clear();
   save();
   updateDoneClasses();
   updateProgress();
-  toast('已清空完成进度');
+  toast(tr('已清空完成进度', 'Completion progress reset.'));
 });
 
 /* ---------- 优先级预设（代码生成 / 代码导入 / 清空） ---------- */
@@ -2139,7 +2954,7 @@ document.getElementById('presetExportBtn').addEventListener('click', async () =>
 document.getElementById('presetImportCodeBtn').addEventListener('click', () => {
   const code = presetCodeEl.value.trim();
   if (!code) {
-    toast('请先粘贴优先级代码');
+    toast(tr('请先粘贴优先级代码', 'Paste a priority code first.'));
     return;
   }
   try {
@@ -2160,7 +2975,7 @@ document.getElementById('presetImportCodeBtn').addEventListener('click', () => {
     closePresetPanel();
     toast('优先级代码导入完成：应用 ' + applied + ' 条');
   } catch (err) {
-    toast('代码导入失败：' + err.message);
+    toast(tr('代码导入失败：', 'Could not import the priority code: ') + err.message);
   }
 });
 
@@ -2170,7 +2985,7 @@ document.getElementById('presetClearBtn').addEventListener('click', () => {
     toast('当前没有自定义优先级');
     return;
   }
-  if (!confirm('确定要清空所有自定义优先级吗？表格自带的优先级保留。')) return;
+  if (!confirm(tr('确定要清空所有自定义优先级吗？表格自带的优先级保留。', 'Clear your custom priorities? Default priorities will be kept.'))) return;
   state.userPri = {};
   renderAll();
   renderTabs();
@@ -2179,7 +2994,7 @@ document.getElementById('presetClearBtn').addEventListener('click', () => {
   applyFilter();
   save();
   closePresetPanel();
-  toast('已清空自定义优先级');
+  toast(tr('已清空自定义优先级', 'Custom priorities cleared.'));
 });
 
 /* ---------- 游戏存档导入（提取已完成的成就） ---------- */
@@ -2243,16 +3058,60 @@ function handleSaveFile(f) {
     try {
       const added = importSaveData(reader.result, f.name);
       const stEl = document.getElementById('steamStatus');
-      if (stEl) { stEl.textContent = '存档导入完成：新增 ' + added + ' 个成就，已更新计数器进度'; stEl.className = 'steam-status ok'; }
-      toast('存档导入完成：新增 ' + added + ' 个成就，已更新计数器进度');
+      if (stEl) { stEl.textContent = tr('存档导入完成：新增 ' + added + ' 个成就，已更新计数器进度', 'Save imported. Progress updated. Added: ' + added); stEl.className = 'steam-status ok'; }
+      toast(tr('存档导入完成：新增 ' + added + ' 个成就，已更新计数器进度', 'Save imported. Progress updated. Added: ' + added));
     } catch (err) {
       const stEl = document.getElementById('steamStatus');
-      if (stEl) { stEl.textContent = '存档导入失败：' + err.message; stEl.className = 'steam-status err'; }
-      toast('存档导入失败：' + err.message);
+      if (stEl) { stEl.textContent = tr('存档导入失败：', 'Save import failed: ') + err.message; stEl.className = 'steam-status err'; }
+      toast(tr('存档导入失败：', 'Save import failed: ') + err.message);
     }
   };
   reader.readAsArrayBuffer(f);
 }
+
+// Steam stores users under the 32-bit account number, not the 64-bit profile ID.
+const steamUserdataPath = 'C:\\Program Files (x86)\\Steam\\userdata';
+
+function userdataAccount(value, allowFolderNumber = false) {
+  const input = value.trim();
+  const profile = input.match(/^(?:https?:\/\/)?steamcommunity\.com\/profiles\/(\d{17})(?:[/?#].*)?$/i);
+  const id = profile ? profile[1] : input;
+  let account;
+  if (/^\d{17}$/.test(id)) account = BigInt(id) - 76561197960265728n;
+  else if (allowFolderNumber && /^\d{1,10}$/.test(id)) account = BigInt(id);
+  else return '';
+  return account > 0n && account <= 0xffffffffn ? String(account) : '';
+}
+
+function updateSavePath() {
+  const manual = document.getElementById('saveAccount').value.trim();
+  const steamInput = document.getElementById('steamInput').value;
+  const account = manual ? userdataAccount(manual, true)
+    : userdataAccount(steamInput || loadRememberedSteam() || '');
+  document.getElementById('savePath').value = account
+    ? steamUserdataPath + '\\' + account + '\\250900\\remote'
+    : steamUserdataPath;
+  document.getElementById('savePathStatus').textContent = account ? '' : tr(
+    '没有可用的数字账号编号。可填写 SteamID64，也可以在 userdata 里查找数字文件夹，再进入 250900\\remote。',
+    'Enter a numeric SteamID64, or find your numbered folder in userdata and open 250900\\remote.'
+  );
+}
+
+document.getElementById('saveLocation').addEventListener('toggle', updateSavePath);
+document.getElementById('saveAccount').addEventListener('input', updateSavePath);
+document.getElementById('steamInput').addEventListener('input', updateSavePath);
+document.getElementById('copySavePath').addEventListener('click', async () => {
+  const path = document.getElementById('savePath');
+  const status = document.getElementById('savePathStatus');
+  try {
+    await navigator.clipboard.writeText(path.value);
+    status.textContent = tr('已复制目录路径。', 'Folder path copied.');
+  } catch {
+    path.focus();
+    path.select();
+    status.textContent = tr('请复制选中的路径。', 'Copy the selected path.');
+  }
+});
 
 // 点击选择文件（保留原有方式）
 document.getElementById('saveImportBtn').addEventListener('click', (e) => {
@@ -2399,12 +3258,26 @@ function steamParseInput(raw) {
   return null;
 }
 
+function steamImportLimitMessage(status, errorCode, body) {
+  const cloudflareError = code => errorCode === code ||
+    new RegExp('\\berror(?:\\s+code)?\\s*:?\\s*' + code + '\\b', 'i').test(body);
+  if (cloudflareError('1027')) return tr(
+    'Cloudflare 每日请求额度已用完，暂时无法从 Steam 拉取成就。请等额度重置后再试，或选择本地存档导入。',
+    'The daily Cloudflare request limit was reached. Steam import is unavailable. Try again after the limit resets or import a local save.'
+  );
+  if (status === 429 || cloudflareError('1015')) return tr(
+    'Steam 导入请求暂时受到限制，无法拉取成就。请稍后再试，或选择本地存档导入。',
+    'Steam import is temporarily rate limited. Try again later or import a local save.'
+  );
+  return '';
+}
+
 async function importFromSteam() {
   const inputEl = document.getElementById('steamInput');
   const mergeEl = document.getElementById('steamMerge');
   if (!inputEl) return;
   const raw = inputEl.value.trim();
-  if (!raw) { setSteamStatus('请先粘贴 Steam 资料链接或 ID', 'err'); return; }
+  if (!raw) { setSteamStatus(tr('请先粘贴 Steam 资料链接或 ID', 'Enter a Steam profile URL or ID.'), 'err'); return; }
 
   const proxy = getSteamProxy();
   if (!proxy || proxy.includes('YOUR-WORKER') || proxy.includes('YOUR-PAGES')) {
@@ -2413,17 +3286,31 @@ async function importFromSteam() {
   }
 
   const q = steamParseInput(raw);
-  if (!q) { setSteamStatus('无法识别输入的链接 / ID，请检查后重试', 'err'); return; }
+  if (!q) { setSteamStatus(tr('无法识别输入的链接 / ID，请检查后重试', 'This Steam URL or ID was not recognized.'), 'err'); return; }
 
   const btn = document.getElementById('steamImportBtn');
   if (btn) btn.disabled = true;
-  setSteamStatus('正在连接 Steam…', 'loading');
+  setSteamStatus(tr('正在连接 Steam…', 'Connecting to Steam…'), 'loading');
   try {
     const resp = await fetch(proxy + '/api/steam?q=' + encodeURIComponent(raw), {
       headers: { 'Accept': 'application/json' },
     });
+    const body = await resp.text();
+    const errorCode = resp.headers.get('cf-error-code') || '';
+    const limitMessage = steamImportLimitMessage(resp.status, errorCode, body);
+    if (limitMessage) {
+      setSteamStatus(limitMessage, 'err');
+      return;
+    }
     let data = null;
-    try { data = await resp.json(); } catch (e) { /* 非 JSON */ }
+    try { data = JSON.parse(body); } catch { /* The proxy may return an HTML error page. */ }
+    if (!data && (resp.status === 404 || resp.status >= 500)) {
+      setSteamStatus(tr(
+        'Steam 导入服务暂不可用，无法拉取成就。请稍后重试，或选择本地存档导入。',
+        'The Steam import service is unavailable. Try again later or import a local save.'
+      ), 'err');
+      return;
+    }
     if (!resp.ok) {
       throw new Error((data && data.error) || ('请求失败（HTTP ' + resp.status + '），请确认 Worker 地址是否正确'));
     }
@@ -2451,15 +3338,16 @@ async function importFromSteam() {
     save();
 
     const extras = skipped ? '（另有 ' + skipped + ' 个 Steam 成就本清单未收录，已忽略）' : '';
-    setSteamStatus('Steam 导入完成：新增 ' + added + ' 个成就' + extras, 'ok');
-    toast('Steam 导入完成：新增 ' + added + ' 个成就');
+    setSteamStatus(tr('Steam 导入完成：新增 ' + added + ' 个成就', 'Steam import complete. Added: ' + added) + extras, 'ok');
+    toast(tr('Steam 导入完成：新增 ' + added + ' 个成就', 'Steam import complete. Added: ' + added));
     // 「记住我的 Steam 账号」：勾选了则记忆，否则清除已有记忆
     const rememberEl = document.getElementById('steamRemember');
     if (rememberEl && rememberEl.checked) saveRememberedSteam(raw);
     else saveRememberedSteam('');
     inputEl.value = '';
   } catch (err) {
-    setSteamStatus('Steam 导入失败：' + err.message, 'err');
+    const fallback = tr('也可以选择本地存档导入。', 'You can also import a local save.');
+    setSteamStatus(tr('Steam 导入失败：', 'Steam import failed: ') + err.message + ' ' + fallback, 'err');
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -2513,7 +3401,7 @@ window.addEventListener('pageshow', (ev) => {
   const age = Date.now() - (st.at || 0);
   if (age > 30 * 60 * 1000) return;   // 标记陈旧（例如跳走后很久才回来）不恢复
   restoreView(st);
-  toast('已回到上次浏览位置');
+  toast(tr('已回到上次浏览位置', 'Returned to your last position.'));
 });
 
 /* ---------- 顶栏「回到上次位置」 ---------- */
@@ -2551,10 +3439,10 @@ const CODEX = {
   detailKey: '',
 };
 const CODEX_TABS = [
-  { id: 'collectible', label: '道具' },
-  { id: 'trinket', label: '饰品' },
-  { id: 'pill', label: '胶囊' },
-  { id: 'card', label: '卡牌·符文' },
+  { id: 'collectible', label: '道具', en: 'Collectibles' },
+  { id: 'trinket', label: '饰品', en: 'Trinkets' },
+  { id: 'pill', label: '胶囊', en: 'Pills' },
+  { id: 'card', label: '卡牌·符文', en: 'Cards & runes' },
 ];
 
 function codexIsOpen() {
@@ -2577,7 +3465,7 @@ function codexLoad() {
       .catch(err => {
         CODEX.loading = null;   // 允许下次打开时重试
         const body = document.getElementById('codexBody');
-        if (body) body.innerHTML = '<div class="codex-sub" style="padding:14px">图鉴数据加载失败，请重试</div>';
+        if (body) body.innerHTML = '<div class="codex-sub" style="padding:14px">' + tr('图鉴数据加载失败，请重试', 'Could not load the item catalog. Try again.') + '</div>';
         throw err;
       });
   }
@@ -2589,13 +3477,35 @@ function codexIconStyle(item, big) {
   return 'style="' + iconStyle(item.sheet, item.cell) + '" class="codex-icon' + (big ? ' lg' : '') + '"';
 }
 
+function codexName(item) {
+  return tr(item.name, item.en || item.name);
+}
+function codexSecondary(item) {
+  const name = tr(item.en, item.en ? item.name : '');
+  return (name ? esc(name) + ' · ' : '') + '#' + item.id;
+}
+function codexCategoryLabel(key, labels) {
+  if (language !== 'en') return labels[key] || key;
+  const words = key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+function refreshCodexLanguage() {
+  for (const tab of CODEX_TABS) {
+    const button = document.querySelector('#codexTabs [data-kind="' + tab.id + '"]');
+    if (button) button.textContent = tr(tab.label, tab.en);
+  }
+  if (!codexIsOpen() || !CODEX.loaded) return;
+  if (CODEX.detail) codexOpenDetail(...CODEX.detailKey.split(':'));
+  else codexRender();
+}
+
 function codexItemHtml(item) {
   return '<div class="codex-item" data-kind="' + item.kind + '" data-id="' + item.id + '">' +
     '<div ' + codexIconStyle(item) + '></div>' +
     '<div class="codex-meta">' +
-      '<div class="codex-name">' + esc(item.name) +
+      '<div class="codex-name">' + esc(codexName(item)) +
         (item.quality != null ? '<span class="codex-q">Q' + esc(item.quality) + '</span>' : '') + '</div>' +
-      '<div class="codex-sub">' + esc(item.en || '') + (item.en ? ' · ' : '') + '#' + item.id + '</div>' +
+      '<div class="codex-sub">' + codexSecondary(item) + '</div>' +
     '</div>' +
   '</div>';
 }
@@ -2721,12 +3631,14 @@ function codexFillFilters() {
     for (const p of (i.pools || [])) if (p !== ',') pools.add(p);
   }
   const opt = (v, label) => '<option value="' + esc(v) + '">' + esc(label) + '</option>';
-  tagSel.innerHTML = '<option value="">全部标签</option>' +
-    [...tags].sort((a, b) => (CODEX_TAG_LABELS[a] || a).localeCompare(CODEX_TAG_LABELS[b] || b))
-      .map(t => opt(t, CODEX_TAG_LABELS[t] || t)).join('');
-  poolSel.innerHTML = '<option value="">全部道具池</option>' +
-    [...pools].sort((a, b) => (CODEX_POOL_LABELS[a] || a).localeCompare(CODEX_POOL_LABELS[b] || b))
-      .map(p => opt(p, CODEX_POOL_LABELS[p] || p)).join('');
+  tagSel.innerHTML = opt('', tr('全部标签', 'All tags')) +
+    [...tags].map(key => [key, codexCategoryLabel(key, CODEX_TAG_LABELS)])
+      .sort((a, b) => a[1].localeCompare(b[1], language))
+      .map(([key, label]) => opt(key, label)).join('');
+  poolSel.innerHTML = opt('', tr('全部道具池', 'All item pools')) +
+    [...pools].map(key => [key, codexCategoryLabel(key, CODEX_POOL_LABELS)])
+      .sort((a, b) => a[1].localeCompare(b[1], language))
+      .map(([key, label]) => opt(key, label)).join('');
   tagSel.value = tags.has(CODEX.tag) ? CODEX.tag : '';
   poolSel.value = pools.has(CODEX.pool) ? CODEX.pool : '';
   CODEX.tag = tagSel.value;
@@ -2783,21 +3695,23 @@ function codexRender() {
   idxEl.classList.toggle('show', CODEX.sort === 'letter' && !q);
 
   if (q) {
-    titleEl.textContent = '精确查找 ' + exact.length + ' 条 · 模糊搜索 ' + fuzzy.length + ' 条';
-    let html = '<div class="codex-section-title">精确查找</div>';
-    html += exact.length ? exact.map(codexItemHtml).join('') : '<div class="codex-sub" style="padding:0 14px">无</div>';
-    html += '<div class="codex-section-title">模糊搜索（点击图标查看详情）</div>';
+    titleEl.textContent = tr('精确查找 ' + exact.length + ' 条 · 模糊搜索 ' + fuzzy.length + ' 条',
+      exact.length + ' exact · ' + fuzzy.length + ' fuzzy');
+    let html = '<div class="codex-section-title">' + tr('精确查找', 'Exact matches') + '</div>';
+    html += exact.length ? exact.map(codexItemHtml).join('') : '<div class="codex-sub" style="padding:0 14px">' + tr('无', 'None') + '</div>';
+    html += '<div class="codex-section-title">' + tr('模糊搜索（点击图标查看详情）', 'Fuzzy matches (select an icon)') + '</div>';
     html += fuzzy.length
       ? '<div class="codex-grid">' + fuzzy.map(i =>
-          '<div ' + codexIconStyle(i) + ' data-kind="' + i.kind + '" data-id="' + i.id + '" title="' + esc(i.name) + '"></div>'
+          '<div ' + codexIconStyle(i) + ' data-kind="' + i.kind + '" data-id="' + i.id + '" title="' + esc(codexName(i)) + '"></div>'
         ).join('') + '</div>'
-      : '<div class="codex-sub" style="padding:0 14px">无</div>';
+      : '<div class="codex-sub" style="padding:0 14px">' + tr('无', 'None') + '</div>';
     body.innerHTML = html;
     idxEl.innerHTML = '';
     return;
   }
 
-  titleEl.textContent = CODEX_TABS.find(t => t.id === CODEX.kind).label + ' · 共 ' + list.length + ' 条';
+  const tab = CODEX_TABS.find(t => t.id === CODEX.kind);
+  titleEl.textContent = tr(tab.label + ' · 共 ' + list.length + ' 条', tab.en + ' · ' + list.length);
 
   if (CODEX.sort === 'id') {
     list.sort((a, b) => b.id - a.id);   // filter 已产生新数组，不会改动 CODEX.items
@@ -2809,7 +3723,7 @@ function codexRender() {
   // 首字母分组
   const groups = new Map();
   for (const it of list) {
-    const ch = (it.ini || '#')[0].toUpperCase();
+    const ch = (tr(it.ini, it.en?.trim()) || '#')[0].toUpperCase();
     const key = /[A-Z]/.test(ch) ? ch : (/\d/.test(ch) ? '0-9' : '#');
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(it);
@@ -2819,7 +3733,7 @@ function codexRender() {
   for (const k of order) {
     const g = groups.get(k);
     if (!g) continue;
-    g.sort((a, b) => a.py.localeCompare(b.py) || a.id - b.id);
+    g.sort((a, b) => tr(a.py, codexName(a)).localeCompare(tr(b.py, codexName(b)), language) || a.id - b.id);
     html += '<div class="codex-group-h" id="cg-' + encodeURIComponent(k) + '">' + k + '（' + g.length + '）</div>';
     html += g.map(codexItemHtml).join('');
   }
@@ -2837,26 +3751,26 @@ function codexOpenDetail(kind, id) {
   CODEX.detailKey = kind + ':' + id;
   // pools 里可能混着字面量 "," 之类的占位 token，过滤掉
   const poolText = (item.pools || []).filter(p => /[A-Za-z0-9_一-鿿]/.test(p))
-    .map(p => CODEX_POOL_LABELS[p] || p).join('、');
-  const pools = poolText ? '<p>道具池：' + esc(poolText) + '</p>' : '';
+    .map(p => codexCategoryLabel(p, CODEX_POOL_LABELS)).join(tr('、', ', '));
+  const pools = poolText ? '<p>' + tr('道具池：', 'Item pools: ') + esc(poolText) + '</p>' : '';
   const q = item.quality != null
-    ? '<p>品质：' + esc('★'.repeat(Number(item.quality) || 0)) + '（Q' + esc(item.quality) + '）</p>' : '';
+    ? '<p>' + tr('品质：', 'Quality: ') + esc('★'.repeat(Number(item.quality) || 0)) + '（Q' + esc(item.quality) + '）</p>' : '';
   const desc = item.desc
-    ? '<div class="codex-desc">' + codexDescHtml(item.desc) + '</div>'
-    : '<p>暂无摘要，可点击下方链接查看 wiki。</p>';
+    ? '<div class="codex-desc" lang="zh-CN">' + codexDescHtml(item.desc) + '</div>'
+    : '<p>' + tr('暂无摘要，可点击下方链接查看 wiki。', 'No description available. See the wiki for details.') + '</p>';
   codexLoadIcons();
   body.innerHTML = '<div class="codex-detail">' +
-    '<button class="codex-close" id="codexBack" aria-label="返回列表">←</button>' +
+    '<button class="codex-close" id="codexBack" aria-label="' + tr('返回列表', 'Back to list') + '">←</button>' +
     '<div ' + codexIconStyle(item, true) + '></div>' +
-    '<h3>' + esc(item.name) + '</h3>' +
-    '<p class="codex-sub">' + esc(item.en || '') + (item.en ? ' · ' : '') + '#' + item.id + '</p>' +
+    '<h3>' + esc(codexName(item)) + '</h3>' +
+    '<p class="codex-sub">' + codexSecondary(item) + '</p>' +
     q + pools + desc +
     // 走 Task 9 的全局拦截：先保存现场再跳转；不要加 target
-    '<p><a href="https://isaac.huijiwiki.com' + esc(item.wiki) + '" data-wiki="1">在 wiki 查看 →</a></p>' +
+    '<p><a href="https://isaac.huijiwiki.com' + esc(item.wiki) + '" data-wiki="1">' + tr('在 wiki 查看 →', 'View on the Chinese wiki →') + '</a></p>' +
     '</div>';
   body.scrollTop = 0;
   document.getElementById('codexIndex').classList.remove('show');
-  document.getElementById('codexSectionTitle').textContent = item.name;
+  document.getElementById('codexSectionTitle').textContent = codexName(item);
 }
 
 function codexViewState() {
@@ -2934,7 +3848,7 @@ function codexInit() {
   if (!tabs || !fab || !overlay || !body || !idxEl) return;
 
   tabs.innerHTML = CODEX_TABS.map(t =>
-    '<button class="codex-tab' + (t.id === CODEX.kind ? ' active' : '') + '" data-kind="' + t.id + '">' + t.label + '</button>'
+    '<button class="codex-tab' + (t.id === CODEX.kind ? ' active' : '') + '" data-kind="' + t.id + '">' + esc(tr(t.label, t.en)) + '</button>'
   ).join('');
 
   tabs.addEventListener('click', (e) => {
@@ -3065,7 +3979,7 @@ function codexInit() {
 }
 
 /* ---------- 初始化 ---------- */
-updateThemeLabel(themeMode);
+applyInterfaceLanguage();
 load();
 // 用户提供的自定义图标（按成就标题匹配），作为默认图标（可被用户再次上传覆盖）
 applyUserIcons();

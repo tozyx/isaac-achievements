@@ -1,24 +1,25 @@
 /* 以撒成就清单 - Service Worker
- * 页面 network-first（尽快拿到新版本），图集/数据 cache-first（体积大，URL 带 ?v= 版本号）。
+ * 页面 network-first，图集/数据 cache-first；所有地址相对于当前站点作用域。
  */
-const CACHE_NAME = 'isaac-checklist-v7';
-const CORE = ['/', '/index.html', '/pwa/manifest.json'];
-// 页面数据（成就/拼音）随页面版本一起更新：cache: 'reload' 绕过本地缓存取最新副本
-const PAGE_DATA = ['/data/ach-py.json'];
-const DATA = ['/data/codex.json', '/data/eid-icons.json'];
+const BASE = self.registration.scope;
+const siteUrl = (path) => new URL(path, BASE).href;
+const CACHE_PREFIX = 'isaac-checklist:' + BASE + ':';
+const CACHE_NAME = CACHE_PREFIX + 'v8';
+const CORE = ['./', 'index.html', 'pwa/manifest.json'].map(siteUrl);
+const PAGE_DATA = ['data/ach-py.json'].map(siteUrl);
+const DATA = ['data/codex.json', 'data/eid-icons.json'].map(siteUrl);
 
 self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    // 预缓存 URL 与页面请求保持一致（/assets/<file>?v=<version>），版本升级后自动拉取新文件
     let assets = [];
     try {
-      const res = await fetch('/assets/manifest.json', { cache: 'no-store' });
+      const res = await fetch(siteUrl('assets/manifest.json'), { cache: 'no-store' });
       const m = res.ok ? await res.json() : null;
       if (m && m.version) {
         assets = Object.values(m)
           .filter((s) => s && typeof s === 'object' && s.file)
-          .map((s) => '/assets/' + s.file + '?v=' + m.version);
+          .map((s) => siteUrl('assets/' + s.file + '?v=' + m.version));
       }
     } catch (e) { /* 离线安装：仅缓存核心页面 */ }
     await cache.addAll(CORE.concat(assets, DATA));
@@ -35,33 +36,39 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys
+        .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
+        .map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  if (request.method !== 'GET' || !request.url.startsWith(self.location.origin)) return;
-  const url = new URL(request.url);
-  const cacheFirst = url.pathname.startsWith('/assets/') || url.pathname.startsWith('/data/');
+  if (request.method !== 'GET' || !request.url.startsWith(BASE)) return;
+  const path = request.url.slice(BASE.length);
+  // Steam API 使用实时数据，不进入静态资源缓存。
+  if (path.startsWith('api/')) return;
+  const cacheFirst = path.startsWith('assets/') || path.startsWith('data/');
 
-  if (cacheFirst) {
-    event.respondWith(
-      caches.match(request).then((hit) => hit || fetch(request).then((res) => {
-        if (res && res.status === 200) caches.open(CACHE_NAME).then((c) => c.put(request, res.clone()));
-        return res;
-      }))
-    );
-    return;
-  }
-
-  event.respondWith(
-    fetch(request)
-      .then((res) => {
-        if (res && res.status === 200) caches.open(CACHE_NAME).then((c) => c.put(request, res.clone()));
-        return res;
-      })
-      .catch(() => caches.match(request).then((hit) => hit || caches.match('/index.html')))
-  );
+  event.respondWith((async () => {
+    const cache = await caches.open(CACHE_NAME);
+    if (cacheFirst) {
+      const hit = await cache.match(request);
+      if (hit) return hit;
+    }
+    try {
+      const res = await fetch(request);
+      if (res && res.status === 200) await cache.put(request, res.clone());
+      return res;
+    } catch (error) {
+      const hit = await cache.match(request);
+      if (hit) return hit;
+      if (request.mode === 'navigate') {
+        const page = await cache.match(siteUrl('index.html'));
+        if (page) return page;
+      }
+      throw error;
+    }
+  })());
 });

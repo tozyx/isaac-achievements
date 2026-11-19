@@ -8,6 +8,7 @@
     "build": "npm run build:clean && npm run build:copy && npm run build:check",
     "build:clean": "rimraf build",
     "build:copy": "node scripts/build.mjs",
+    "build:pages": "node scripts/build.mjs --static",
     "build:check": "tsc --noEmit -p tsconfig.app.json",
     "gen": "node scripts/extract-sources.mjs && node scripts/snapshot-data.mjs && node scripts/gen-assets.mjs && node scripts/gen-codex.mjs && node scripts/gen-eid-icons.mjs && node scripts/patch-html.mjs",
     "preview-api": "npm run build && wrangler pages dev",

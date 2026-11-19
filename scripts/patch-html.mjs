@@ -32,8 +32,9 @@ if (assetsRe.test(html)) {
 }
 
 // 3) 首屏必需图集预加载（成就卡片图标）；URL 必须与 assetUrl() 逐字节一致
-const preloadRe = /<link rel="preload" as="image" href="\/assets\/atlas-ach\.png[^"]*"[^>]*>\n?/;
-const preload = '<link rel="preload" as="image" href="/assets/atlas-ach.png?v=' + manifest.version + '" fetchpriority="high">\n';
+const preloadRe = /<link rel="preload" as="image" href="(?:\.)?\/assets\/atlas-ach\.png[^"]*"[^>]*>(?:\r?\n)?/;
+const newline = html.includes('\r\n') ? '\r\n' : '\n';
+const preload = '<link rel="preload" as="image" href="./assets/atlas-ach.png?v=' + manifest.version + '" fetchpriority="high">' + newline;
 html = preloadRe.test(html) ? html.replace(preloadRe, () => preload) : html.replace('</head>', () => preload + '</head>');
 
 // 4) 内联搜索库（浏览器与 Node 共用同一份源码）

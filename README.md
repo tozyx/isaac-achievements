@@ -4,7 +4,7 @@
 
 一个开箱即用的静态网页工具，帮你逐项追踪《以撒的结合》**全部 641 项成就**的完成情况（含普通角色 242、堕化角色 119、其余成就 93、完成挑战 48、Boss 击败 38 等分类）。所有数据保存在浏览器本地，无需注册登录，离线可用。
 
-**在线使用（含 Steam 导入）**：<https://tozyx-isaac-achievements.pages.dev/> · [GitHub Pages 静态版](https://tozyx.github.io/isaac-achievements/)
+**在线使用（含 Steam 导入）**：<https://isaac641.pages.dev/> · [GitHub Pages 静态版](https://tozyx.github.io/isaac-achievements/)
 
 **原项目**：[Feather-bai/isaac-achievements](https://github.com/Feather-bai/isaac-achievements) · **原作者在线版**：<https://isaac-achievement.19x19.top/>
 
@@ -24,7 +24,7 @@
 
 ## 🚀 快速使用
 
-1. 打开[Cloudflare 在线版](https://tozyx-isaac-achievements.pages.dev/)，或按下文启动本地 HTTP 预览；不要直接双击 `index.html`，外置图集和 JSON 数据需要通过 HTTP 加载
+1. 打开[Cloudflare 在线版](https://isaac641.pages.dev/)，或按下文启动本地 HTTP 预览；不要直接双击 `index.html`，外置图集和 JSON 数据需要通过 HTTP 加载
 2. 对照清单勾选你已完成的成就
 3. 想从 Steam 同步？在 Cloudflare 在线版的「更多操作」里粘贴 Steam 资料链接，点 **从 Steam 导入**；只部署 GitHub Pages 时可使用手动勾选和本地存档导入
 4. 定期导出备份，换设备时导入即可恢复

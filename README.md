@@ -4,7 +4,7 @@
 
 一个开箱即用的静态网页工具，帮你逐项追踪《以撒的结合》**全部 641 项成就**的完成情况（含普通角色 242、堕化角色 119、其余成就 93、完成挑战 48、Boss 击败 38 等分类）。所有数据保存在浏览器本地，无需注册登录，离线可用。
 
-**本 Fork 的 GitHub Pages 地址**：<https://tozyx.github.io/isaac-achievements/>（首次访问前需按下文完成部署）
+**在线使用（含 Steam 导入）**：<https://tozyx-isaac-achievements.pages.dev/> · [GitHub Pages 静态版](https://tozyx.github.io/isaac-achievements/)
 
 **原项目**：[Feather-bai/isaac-achievements](https://github.com/Feather-bai/isaac-achievements) · **原作者在线版**：<https://isaac-achievement.19x19.top/>
 
@@ -17,16 +17,16 @@
 - **Steam 成就导入**：粘贴 Steam 资料链接 / 17 位 ID / 自定义短链，一键拉取已解锁成就自动勾选（两种模式）
 - **存档导入**：直接导入游戏本地存档文件（`persistentgamedata2.dat`），自动解析已解锁成就
 - **优先级标记**：自定义标记哪些成就「想先做」，导出 / 导入优先级预设
-- **主题切换**：深色 / 浅色 / 跟随系统
+- **主题切换**：浅色、深色或自动。首次访问默认按本地时间显示，06:00 至 22:00 前为浅色，其余时间为深色；再次访问沿用已保存的模式。
 - **道具图鉴**：右下角「道具」按钮打开，含道具 721 / 饰品 188 / 胶囊 50 / 卡牌·符文 97，支持首字母索引、ID 排序、品质筛选，以及精确/模糊两栏搜索（别名、拼音、错字）
 - **回到上次位置**：从 wiki 返回后自动恢复标签页与滚动位置
 - **完全离线**：单页应用，图标与图鉴数据随页面按需加载，缓存后可断网使用；支持 PWA 安装到主屏幕
 
 ## 🚀 快速使用
 
-1. 打开[本 Fork 在线版](https://tozyx.github.io/isaac-achievements/)，或按下文启动本地 HTTP 预览；不要直接双击 `index.html`，外置图集和 JSON 数据需要通过 HTTP 加载
+1. 打开[Cloudflare 在线版](https://tozyx-isaac-achievements.pages.dev/)，或按下文启动本地 HTTP 预览；不要直接双击 `index.html`，外置图集和 JSON 数据需要通过 HTTP 加载
 2. 对照清单勾选你已完成的成就
-3. 想从 Steam 同步？先部署下文的 Steam 代理，再在「更多操作」里粘贴 Steam 资料链接，点 **从 Steam 导入**；只部署 GitHub Pages 时可使用手动勾选和本地存档导入
+3. 想从 Steam 同步？在 Cloudflare 在线版的「更多操作」里粘贴 Steam 资料链接，点 **从 Steam 导入**；只部署 GitHub Pages 时可使用手动勾选和本地存档导入
 4. 定期导出备份，换设备时导入即可恢复
 
 ### Steam 导入支持两种模式
@@ -128,7 +128,7 @@ npm run preview-api
 npm run deploy
 ```
 
-也可以把仓库推到 GitHub，在 Cloudflare Dashboard → **Workers & Pages → 创建 → Pages → 连接 Git 仓库**，构建命令填 `npm run build`，输出目录填 `build`，之后每次 push 自动重新部署。
+也可以把仓库推到 GitHub，在 Cloudflare Dashboard → **Workers & Pages → 创建 → Pages → 连接 Git 仓库**，构建命令填 `npm run build`，输出目录填 `build`，启用自动生产部署并将生产分支设为 `main` 后，每次推送到 `main` 都会触发构建。构建成功后，同一个 `pages.dev` 地址会提供新版。可在 Cloudflare 项目的 **Deployments** 中核对提交号和部署结果。
 
 ## 📄 数据说明
 

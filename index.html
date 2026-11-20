@@ -157,6 +157,11 @@ body {
 /* Overall progress */
 .overall-wrap { margin-top: 12px; }
 .overall-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.progress-import { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 6px; }
+.progress-import .tool-btn { padding: 4px 9px; font-size: 12px; }
+.progress-import time, .progress-import-date { font-size: 12px; color: var(--text-2); }
+.progress-import .steam-status { flex-basis: 100%; }
+.progress-import .steam-status:empty { display: none; }
 .overall-label { font-size: 13px; font-weight: 700; color: var(--text-2); letter-spacing: .3px; }
 .overall-stats { font-size: 13px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
 .overall-bar {
@@ -872,6 +877,12 @@ main { max-width: 1480px; margin: 0 auto; padding: 22px 20px 80px; }
         <span class="overall-stats" id="overallStats">0 / 0（0%）</span>
       </div>
       <div class="overall-bar"><div class="overall-fill" id="overallFill"></div></div>
+      <div class="progress-import">
+        <button class="tool-btn" id="steamRefreshBtn" type="button">更新 Steam 成就</button>
+        <span class="progress-import-date" id="lastImportEmpty"></span>
+        <time id="lastImportTime" hidden></time>
+        <span class="steam-status" id="steamRefreshStatus" role="status"></span>
+      </div>
     </div>
 
     <div class="controls">
@@ -1183,6 +1194,7 @@ const COUNTER_MAP = {
 };
 const state = {
   completed: new Set(),   // id(string)
+  lastImport: null,       // { source, at } for the latest successful import
   icons: {},              // id -> dataURL (自定义图标优先)
   userPri: {},            // id -> '优先'|'推荐' (用户自定义优先级，覆盖表格默认)
   charIcons: {},          // id -> dataURL (堕化角色头像)
@@ -1907,6 +1919,7 @@ const interfaceEnglish = [
   ['#backToViewBtn .tb-text', 'Back to last position'],
   ['#backToViewBtn', 'Back to last position', 'title'],
   ['.overall-label', 'Overall progress'],
+  ['#steamRefreshBtn', 'Refresh Steam achievements'],
   ['#search', 'Search achievements, rewards, or requirements…', 'placeholder'],
   ['#hideDoneBtn', 'Show or hide completed achievements', 'title'],
   ['#priFilter', 'Filter by priority', 'title'],
@@ -1971,6 +1984,7 @@ function applyInterfaceLanguage() {
     ? tr('显示已完成', 'Show completed') : tr('隐藏已完成', 'Hide completed');
   updateThemeLabel(themeMode);
   updateSavePath();
+  renderLastImport();
 }
 
 document.getElementById('languageBtn').addEventListener('click', () => {
@@ -2450,6 +2464,31 @@ function updateDoneClasses() {
   });
 }
 
+function renderLastImport() {
+  const empty = document.getElementById('lastImportEmpty');
+  const time = document.getElementById('lastImportTime');
+  const last = state.lastImport;
+  empty.hidden = !!last;
+  time.hidden = !last;
+  if (!last) {
+    empty.textContent = tr('尚未导入进度', 'Progress has not been imported yet');
+    return;
+  }
+  const date = new Date(last.at);
+  const formatted = new Intl.DateTimeFormat(language, {
+    dateStyle: 'medium', timeStyle: 'short',
+  }).format(date);
+  const source = last.source === 'steam' ? 'Steam' : tr('本地存档', 'Local save');
+  time.dateTime = date.toISOString();
+  time.textContent = tr('上次更新：', 'Last updated: ') + formatted + ' · ' + source;
+}
+
+function saveImportSuccess(source) {
+  state.lastImport = { source, at: Date.now() };
+  save();
+  renderLastImport();
+}
+
 /* ---------- 持久化 ---------- */
 function save() {
   const payload = {
@@ -2457,6 +2496,7 @@ function save() {
     icons: state.icons,
     userPri: state.userPri,
     progress: state.progress,
+    lastImport: state.lastImport,
   };
   try { localStorage.setItem(STORE_KEY, JSON.stringify(payload)); }
   catch (e) { console.warn('save failed', e); }
@@ -2474,6 +2514,11 @@ function load() {
       }
     }
     if (p.progress && typeof p.progress === 'object') state.progress = p.progress;
+    const last = p.lastImport;
+    if (last && (last.source === 'steam' || last.source === 'save') &&
+        typeof last.at === 'number' && last.at > 0 && Number.isFinite(new Date(last.at).getTime())) {
+      state.lastImport = last;
+    }
   } catch (e) { console.warn('load failed', e); }
 }
 
@@ -3060,6 +3105,9 @@ function handleSaveFile(f) {
       toast(tr('存档导入失败：', 'Save import failed: ') + err.message);
     }
   };
+  reader.onerror = () => {
+    setSteamStatus(tr('无法读取存档文件，请重新选择。', 'Could not read the save file. Select it again.'), 'err');
+  };
   reader.readAsArrayBuffer(f);
 }
 
@@ -3178,7 +3226,7 @@ function importSaveData(buf, sourceName) {
   updateDoneClasses();
   updateProgress();
   applyFilter();
-  save();
+  saveImportSuccess('save');
   return added;
 }
 
@@ -3266,25 +3314,41 @@ function steamImportLimitMessage(status, errorCode, body) {
   return '';
 }
 
-async function importFromSteam() {
+let steamImportInFlight = false;
+
+async function importFromSteam({ quick = false } = {}) {
+  if (steamImportInFlight) return;
   const inputEl = document.getElementById('steamInput');
-  const mergeEl = document.getElementById('steamMerge');
-  if (!inputEl) return;
-  const raw = inputEl.value.trim();
-  if (!raw) { setSteamStatus(tr('请先粘贴 Steam 资料链接或 ID', 'Enter a Steam profile URL or ID.'), 'err'); return; }
+  const raw = quick ? loadRememberedSteam() : inputEl.value.trim();
+  if (quick && !raw) {
+    document.getElementById('importAchBtn').click();
+    inputEl.focus();
+    return;
+  }
+  const keepExisting = quick || document.getElementById('steamMerge').checked;
+  const remember = !quick && document.getElementById('steamRemember').checked;
+  const refreshStatus = document.getElementById('steamRefreshStatus');
+  refreshStatus.textContent = '';
+  const report = (message, type) => {
+    if (!quick) return setSteamStatus(message, type);
+    refreshStatus.textContent = message;
+    refreshStatus.className = 'steam-status ' + type;
+  };
+  if (!raw) { report(tr('请先粘贴 Steam 资料链接或 ID', 'Enter a Steam profile URL or ID.'), 'err'); return; }
 
   const proxy = getSteamProxy();
   if (!proxy || proxy.includes('YOUR-WORKER') || proxy.includes('YOUR-PAGES')) {
-    setSteamStatus('尚未配置 Steam 代理地址。将网页部署到 Cloudflare Pages 后即可直接使用（详见 README），或控制台执行 localStorage.setItem("isaac_steam_proxy", "你的代理地址") 后刷新。', 'err');
+    report('尚未配置 Steam 代理地址。将网页部署到 Cloudflare Pages 后即可直接使用（详见 README），或控制台执行 localStorage.setItem("isaac_steam_proxy", "你的代理地址") 后刷新。', 'err');
     return;
   }
 
   const q = steamParseInput(raw);
-  if (!q) { setSteamStatus(tr('无法识别输入的链接 / ID，请检查后重试', 'This Steam URL or ID was not recognized.'), 'err'); return; }
+  if (!q) { report(tr('无法识别输入的链接 / ID，请检查后重试', 'This Steam URL or ID was not recognized.'), 'err'); return; }
 
-  const btn = document.getElementById('steamImportBtn');
-  if (btn) btn.disabled = true;
-  setSteamStatus(tr('正在连接 Steam…', 'Connecting to Steam…'), 'loading');
+  const buttons = ['steamImportBtn', 'steamRefreshBtn'].map(id => document.getElementById(id));
+  steamImportInFlight = true;
+  buttons.forEach(button => { button.disabled = true; });
+  report(tr('正在连接 Steam…', 'Connecting to Steam…'), 'loading');
   try {
     const resp = await fetch(proxy + '/api/steam?q=' + encodeURIComponent(raw), {
       headers: { 'Accept': 'application/json' },
@@ -3293,13 +3357,13 @@ async function importFromSteam() {
     const errorCode = resp.headers.get('cf-error-code') || '';
     const limitMessage = steamImportLimitMessage(resp.status, errorCode, body);
     if (limitMessage) {
-      setSteamStatus(limitMessage, 'err');
+      report(limitMessage, 'err');
       return;
     }
     let data = null;
     try { data = JSON.parse(body); } catch { /* The proxy may return an HTML error page. */ }
     if (!data && (resp.status === 404 || resp.status >= 500)) {
-      setSteamStatus(tr(
+      report(tr(
         'Steam 导入服务暂不可用，无法拉取成就。请稍后重试，或选择本地存档导入。',
         'The Steam import service is unavailable. Try again later or import a local save.'
       ), 'err');
@@ -3313,7 +3377,6 @@ async function importFromSteam() {
     }
 
     // 合并模式：把当前已勾选 + Steam 解锁并集
-    const keepExisting = !mergeEl || mergeEl.checked;
     if (!keepExisting) state.completed.clear();
 
     let added = 0, skipped = 0;
@@ -3329,26 +3392,29 @@ async function importFromSteam() {
     updateDoneClasses();
     updateProgress();
     applyFilter();
-    save();
+    saveImportSuccess('steam');
 
     const extras = skipped ? '（另有 ' + skipped + ' 个 Steam 成就本清单未收录，已忽略）' : '';
-    setSteamStatus(tr('Steam 导入完成：新增 ' + added + ' 个成就', 'Steam import complete. Added: ' + added) + extras, 'ok');
+    report(tr('Steam 导入完成：新增 ' + added + ' 个成就', 'Steam import complete. Added: ' + added) + extras, 'ok');
     toast(tr('Steam 导入完成：新增 ' + added + ' 个成就', 'Steam import complete. Added: ' + added));
     // 「记住我的 Steam 账号」：勾选了则记忆，否则清除已有记忆
-    const rememberEl = document.getElementById('steamRemember');
-    if (rememberEl && rememberEl.checked) saveRememberedSteam(raw);
-    else saveRememberedSteam('');
-    inputEl.value = '';
+    if (!quick) {
+      saveRememberedSteam(remember ? raw : '');
+      if (inputEl.value.trim() === raw) inputEl.value = '';
+      updateSavePath();
+    }
   } catch (err) {
     const fallback = tr('也可以选择本地存档导入。', 'You can also import a local save.');
-    setSteamStatus(tr('Steam 导入失败：', 'Steam import failed: ') + err.message + ' ' + fallback, 'err');
+    report(tr('Steam 导入失败：', 'Steam import failed: ') + err.message + ' ' + fallback, 'err');
   } finally {
-    if (btn) btn.disabled = false;
+    steamImportInFlight = false;
+    buttons.forEach(button => { button.disabled = false; });
   }
 }
 
 const steamImportBtn = document.getElementById('steamImportBtn');
-if (steamImportBtn) steamImportBtn.addEventListener('click', importFromSteam);
+steamImportBtn.addEventListener('click', () => importFromSteam());
+document.getElementById('steamRefreshBtn').addEventListener('click', () => importFromSteam({ quick: true }));
 const steamInputEl = document.getElementById('steamInput');
 if (steamInputEl) steamInputEl.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') importFromSteam();
@@ -3973,8 +4039,8 @@ function codexInit() {
 }
 
 /* ---------- 初始化 ---------- */
-applyInterfaceLanguage();
 load();
+applyInterfaceLanguage();
 // 用户提供的自定义图标（按成就标题匹配），作为默认图标（可被用户再次上传覆盖）
 applyUserIcons();
 generateWikiIcons();
